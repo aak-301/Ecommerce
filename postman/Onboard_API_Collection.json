@@ -1,0 +1,519 @@
+{
+  "info": {
+    "name": "Onboard API Collection",
+    "description": "Complete API collection for testing the onboard feature",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:3000/api",
+      "type": "string"
+    },
+    {
+      "key": "authToken",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "adminId",
+      "value": "",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "Authentication",
+      "item": [
+        {
+          "name": "Request Magic Link (Super Admin)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"superadmin@example.com\",\n  \"name\": \"Super Admin\",\n  \"role\": \"super_admin\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/auth/request-magic-link",
+              "host": ["{{baseUrl}}"],
+              "path": ["auth", "request-magic-link"]
+            }
+          }
+        },
+        {
+          "name": "Request Magic Link (Admin)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"admin@example.com\",\n  \"name\": \"Test Admin\",\n  \"role\": \"admin\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/auth/request-magic-link",
+              "host": ["{{baseUrl}}"],
+              "path": ["auth", "request-magic-link"]
+            }
+          }
+        },
+        {
+          "name": "Verify Magic Link",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"token\": \"your-magic-token-here\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/auth/verify-magic-link",
+              "host": ["{{baseUrl}}"],
+              "path": ["auth", "verify-magic-link"]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.to.have.status(200)) {",
+                  "    const responseJson = pm.response.json();",
+                  "    if (responseJson.data && responseJson.data.token) {",
+                  "        pm.collectionVariables.set('authToken', responseJson.data.token);",
+                  "    }",
+                  "}"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Onboard Management",
+      "item": [
+        {
+          "name": "Get Onboarding Statistics",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/onboard/stats",
+              "host": ["{{baseUrl}}"],
+              "path": ["onboard", "stats"]
+            }
+          }
+        },
+        {
+          "name": "Get Pending Admins Count",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/onboard/pending/count",
+              "host": ["{{baseUrl}}"],
+              "path": ["onboard", "pending", "count"]
+            }
+          }
+        },
+        {
+          "name": "Get All Pending Admins",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/onboard/pending",
+              "host": ["{{baseUrl}}"],
+              "path": ["onboard", "pending"]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.to.have.status(200)) {",
+                  "    const responseJson = pm.response.json();",
+                  "    if (responseJson.data && responseJson.data.admins && responseJson.data.admins.length > 0) {",
+                  "        pm.collectionVariables.set('adminId', responseJson.data.admins[0].id);",
+                  "    }",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get All Admins (with filters)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/onboard/admins?status=pending&limit=10&offset=0",
+              "host": ["{{baseUrl}}"],
+              "path": ["onboard", "admins"],
+              "query": [
+                {
+                  "key": "status",
+                  "value": "pending"
+                },
+                {
+                  "key": "limit",
+                  "value": "10"
+                },
+                {
+                  "key": "offset",
+                  "value": "0"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get All Active Admins",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/onboard/admins?status=active",
+              "host": ["{{baseUrl}}"],
+              "path": ["onboard", "admins"],
+              "query": [
+                {
+                  "key": "status",
+                  "value": "active"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Search Admins",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/onboard/admins?search=admin&limit=20",
+              "host": ["{{baseUrl}}"],
+              "path": ["onboard", "admins"],
+              "query": [
+                {
+                  "key": "search",
+                  "value": "admin"
+                },
+                {
+                  "key": "limit",
+                  "value": "20"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get Admin by ID",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/onboard/admins/{{adminId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["onboard", "admins", "{{adminId}}"]
+            }
+          }
+        },
+        {
+          "name": "Get My Onboarded Admins",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/onboard/my-admins?limit=10&offset=0",
+              "host": ["{{baseUrl}}"],
+              "path": ["onboard", "my-admins"],
+              "query": [
+                {
+                  "key": "limit",
+                  "value": "10"
+                },
+                {
+                  "key": "offset",
+                  "value": "0"
+                }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Onboard Actions",
+      "item": [
+        {
+          "name": "Approve Admin",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"userId\": \"{{adminId}}\",\n  \"action\": \"approve\",\n  \"notes\": \"Welcome to the team! You have been approved as an admin.\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/onboard/process",
+              "host": ["{{baseUrl}}"],
+              "path": ["onboard", "process"]
+            }
+          }
+        },
+        {
+          "name": "Reject Admin",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"userId\": \"{{adminId}}\",\n  \"action\": \"reject\",\n  \"reason\": \"Insufficient qualifications for the admin role\",\n  \"notes\": \"Please reapply after gaining more experience in the field.\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/onboard/process",
+              "host": ["{{baseUrl}}"],
+              "path": ["onboard", "process"]
+            }
+          }
+        },
+        {
+          "name": "Suspend Admin",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"userId\": \"{{adminId}}\",\n  \"action\": \"suspend\",\n  \"reason\": \"Violation of company policies\",\n  \"notes\": \"Account suspended pending investigation. Contact HR for more details.\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/onboard/process",
+              "host": ["{{baseUrl}}"],
+              "path": ["onboard", "process"]
+            }
+          }
+        },
+        {
+          "name": "Reactivate Admin",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"userId\": \"{{adminId}}\",\n  \"notes\": \"Investigation completed. Account has been reactivated.\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/onboard/reactivate",
+              "host": ["{{baseUrl}}"],
+              "path": ["onboard", "reactivate"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Error Scenarios",
+      "item": [
+        {
+          "name": "Approve Non-existent Admin",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"userId\": \"00000000-0000-0000-0000-000000000000\",\n  \"action\": \"approve\",\n  \"notes\": \"This should fail\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/onboard/process",
+              "host": ["{{baseUrl}}"],
+              "path": ["onboard", "process"]
+            }
+          }
+        },
+        {
+          "name": "Invalid Action",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"userId\": \"{{adminId}}\",\n  \"action\": \"invalid_action\",\n  \"notes\": \"This should fail validation\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/onboard/process",
+              "host": ["{{baseUrl}}"],
+              "path": ["onboard", "process"]
+            }
+          }
+        },
+        {
+          "name": "Missing Required Reason for Reject",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"userId\": \"{{adminId}}\",\n  \"action\": \"reject\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/onboard/process",
+              "host": ["{{baseUrl}}"],
+              "path": ["onboard", "process"]
+            }
+          }
+        },
+        {
+          "name": "Unauthorized Access (No Token)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/onboard/pending",
+              "host": ["{{baseUrl}}"],
+              "path": ["onboard", "pending"]
+            }
+          }
+        },
+        {
+          "name": "Invalid Admin ID Format",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/onboard/admins/invalid-uuid",
+              "host": ["{{baseUrl}}"],
+              "path": ["onboard", "admins", "invalid-uuid"]
+            }
+          }
+        }
+      ]
+    }
+  ]
+}

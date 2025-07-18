@@ -1,0 +1,933 @@
+{
+  "info": {
+    "name": "Complete Authentication System",
+    "description": "Test all features: Auth, Onboarding, Account Management",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:3000/api",
+      "type": "string"
+    },
+    {
+      "key": "superAdminToken",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "adminToken",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "customerToken",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "testAdminId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "testCustomerId",
+      "value": "",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "1. Authentication Flow",
+      "item": [
+        {
+          "name": "Request Magic Link (Super Admin)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"superadmin@example.com\",\n  \"name\": \"Super Admin\",\n  \"role\": \"super_admin\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/auth/request-magic-link",
+              "host": ["{{baseUrl}}"],
+              "path": ["auth", "request-magic-link"]
+            }
+          }
+        },
+        {
+          "name": "Request Magic Link (Admin)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"admin@test.com\",\n  \"name\": \"Test Admin\",\n  \"role\": \"admin\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/auth/request-magic-link",
+              "host": ["{{baseUrl}}"],
+              "path": ["auth", "request-magic-link"]
+            }
+          }
+        },
+        {
+          "name": "Request Magic Link (Customer)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"customer@test.com\",\n  \"name\": \"Test Customer\",\n  \"role\": \"customer\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/auth/request-magic-link",
+              "host": ["{{baseUrl}}"],
+              "path": ["auth", "request-magic-link"]
+            }
+          }
+        },
+        {
+          "name": "Verify Magic Link (Super Admin)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"token\": \"PUT_SUPER_ADMIN_MAGIC_TOKEN_HERE\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/auth/verify-magic-link",
+              "host": ["{{baseUrl}}"],
+              "path": ["auth", "verify-magic-link"]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.to.have.status(200)) {",
+                  "    const responseJson = pm.response.json();",
+                  "    if (responseJson.data && responseJson.data.token) {",
+                  "        pm.collectionVariables.set('superAdminToken', responseJson.data.token);",
+                  "    }",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Verify Magic Link (Admin)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"token\": \"PUT_ADMIN_MAGIC_TOKEN_HERE\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/auth/verify-magic-link",
+              "host": ["{{baseUrl}}"],
+              "path": ["auth", "verify-magic-link"]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.to.have.status(200)) {",
+                  "    const responseJson = pm.response.json();",
+                  "    if (responseJson.data && responseJson.data.token) {",
+                  "        pm.collectionVariables.set('adminToken', responseJson.data.token);",
+                  "        if (responseJson.data.user && responseJson.data.user.id) {",
+                  "            pm.collectionVariables.set('testAdminId', responseJson.data.user.id);",
+                  "        }",
+                  "    }",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Verify Magic Link (Customer)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"token\": \"PUT_CUSTOMER_MAGIC_TOKEN_HERE\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/auth/verify-magic-link",
+              "host": ["{{baseUrl}}"],
+              "path": ["auth", "verify-magic-link"]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.to.have.status(200)) {",
+                  "    const responseJson = pm.response.json();",
+                  "    if (responseJson.data && responseJson.data.token) {",
+                  "        pm.collectionVariables.set('customerToken', responseJson.data.token);",
+                  "        if (responseJson.data.user && responseJson.data.user.id) {",
+                  "            pm.collectionVariables.set('testCustomerId', responseJson.data.user.id);",
+                  "        }",
+                  "    }",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get Current User (Super Admin)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{superAdminToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auth/me",
+              "host": ["{{baseUrl}}"],
+              "path": ["auth", "me"]
+            }
+          }
+        },
+        {
+          "name": "Get Current User (Admin)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auth/me",
+              "host": ["{{baseUrl}}"],
+              "path": ["auth", "me"]
+            }
+          }
+        },
+        {
+          "name": "Get Current User (Customer)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{customerToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auth/me",
+              "host": ["{{baseUrl}}"],
+              "path": ["auth", "me"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "2. Onboarding Management",
+      "item": [
+        {
+          "name": "Get Onboarding Stats",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{superAdminToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/onboard/stats",
+              "host": ["{{baseUrl}}"],
+              "path": ["onboard", "stats"]
+            }
+          }
+        },
+        {
+          "name": "Get Pending Admins Count",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{superAdminToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/onboard/pending/count",
+              "host": ["{{baseUrl}}"],
+              "path": ["onboard", "pending", "count"]
+            }
+          }
+        },
+        {
+          "name": "Get All Pending Admins",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{superAdminToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/onboard/pending",
+              "host": ["{{baseUrl}}"],
+              "path": ["onboard", "pending"]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.to.have.status(200)) {",
+                  "    const responseJson = pm.response.json();",
+                  "    if (responseJson.data && responseJson.data.admins && responseJson.data.admins.length > 0) {",
+                  "        pm.collectionVariables.set('testAdminId', responseJson.data.admins[0].id);",
+                  "    }",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get All Admins",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{superAdminToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/onboard/admins?limit=20",
+              "host": ["{{baseUrl}}"],
+              "path": ["onboard", "admins"],
+              "query": [
+                {
+                  "key": "limit",
+                  "value": "20"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Approve Admin",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{superAdminToken}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"userId\": \"{{testAdminId}}\",\n  \"action\": \"approve\",\n  \"notes\": \"Approved by super admin for testing\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/onboard/process",
+              "host": ["{{baseUrl}}"],
+              "path": ["onboard", "process"]
+            }
+          }
+        },
+        {
+          "name": "Reject Admin",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{superAdminToken}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"userId\": \"{{testAdminId}}\",\n  \"action\": \"reject\",\n  \"reason\": \"Application does not meet requirements\",\n  \"notes\": \"Please reapply with proper documentation\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/onboard/process",
+              "host": ["{{baseUrl}}"],
+              "path": ["onboard", "process"]
+            }
+          }
+        },
+        {
+          "name": "Suspend Admin",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{superAdminToken}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"userId\": \"{{testAdminId}}\",\n  \"action\": \"suspend\",\n  \"reason\": \"Policy violation detected\",\n  \"notes\": \"Account suspended pending investigation\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/onboard/process",
+              "host": ["{{baseUrl}}"],
+              "path": ["onboard", "process"]
+            }
+          }
+        },
+        {
+          "name": "Reactivate Admin",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{superAdminToken}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"userId\": \"{{testAdminId}}\",\n  \"notes\": \"Investigation completed, account reactivated\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/onboard/reactivate",
+              "host": ["{{baseUrl}}"],
+              "path": ["onboard", "reactivate"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "3. Account Management",
+      "item": [
+        {
+          "name": "Logout (Manual)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{customerToken}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"reason\": \"manual\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/account/logout",
+              "host": ["{{baseUrl}}"],
+              "path": ["account", "logout"]
+            }
+          }
+        },
+        {
+          "name": "Logout (Security)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{superAdminToken}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"reason\": \"security\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/account/logout",
+              "host": ["{{baseUrl}}"],
+              "path": ["account", "logout"]
+            }
+          }
+        },
+        {
+          "name": "Get Logout History",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{customerToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/account/logout-history?limit=10",
+              "host": ["{{baseUrl}}"],
+              "path": ["account", "logout-history"],
+              "query": [
+                {
+                  "key": "limit",
+                  "value": "10"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Check Token Status",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{customerToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/account/token-status",
+              "host": ["{{baseUrl}}"],
+              "path": ["account", "token-status"]
+            }
+          }
+        },
+        {
+          "name": "Self Delete Account",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{customerToken}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"reason\": \"No longer need this service\",\n  \"feedback\": \"App was great but switching to different solution\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/account/delete",
+              "host": ["{{baseUrl}}"],
+              "path": ["account", "delete"]
+            }
+          }
+        },
+        {
+          "name": "Admin Delete Account",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{superAdminToken}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"userId\": \"{{testCustomerId}}\",\n  \"reason\": \"policy_violation\",\n  \"notes\": \"Account deleted due to spam activity\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/account/admin/delete",
+              "host": ["{{baseUrl}}"],
+              "path": ["account", "admin", "delete"]
+            }
+          }
+        },
+        {
+          "name": "Force Logout User",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{superAdminToken}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"userId\": \"{{testCustomerId}}\",\n  \"reason\": \"Security investigation in progress\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/account/admin/force-logout",
+              "host": ["{{baseUrl}}"],
+              "path": ["account", "admin", "force-logout"]
+            }
+          }
+        },
+        {
+          "name": "Get User by ID",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{superAdminToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/account/admin/users/{{testCustomerId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["account", "admin", "users", "{{testCustomerId}}"]
+            }
+          }
+        },
+        {
+          "name": "Restore Deleted Account",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{superAdminToken}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"userId\": \"{{testCustomerId}}\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/account/admin/restore",
+              "host": ["{{baseUrl}}"],
+              "path": ["account", "admin", "restore"]
+            }
+          }
+        },
+        {
+          "name": "Get Deleted Accounts",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{superAdminToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/account/admin/deleted?limit=20",
+              "host": ["{{baseUrl}}"],
+              "path": ["account", "admin", "deleted"],
+              "query": [
+                {
+                  "key": "limit",
+                  "value": "20"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get Account Deletion Stats",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{superAdminToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/account/admin/deletion-stats",
+              "host": ["{{baseUrl}}"],
+              "path": ["account", "admin", "deletion-stats"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "4. Error Scenarios",
+      "item": [
+        {
+          "name": "Invalid Magic Link",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"token\": \"invalid-token-12345\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/auth/verify-magic-link",
+              "host": ["{{baseUrl}}"],
+              "path": ["auth", "verify-magic-link"]
+            }
+          }
+        },
+        {
+          "name": "Unauthorized Access",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/onboard/stats",
+              "host": ["{{baseUrl}}"],
+              "path": ["onboard", "stats"]
+            }
+          }
+        },
+        {
+          "name": "Invalid User ID",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{superAdminToken}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"userId\": \"invalid-uuid\",\n  \"action\": \"approve\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/onboard/process",
+              "host": ["{{baseUrl}}"],
+              "path": ["onboard", "process"]
+            }
+          }
+        },
+        {
+          "name": "Missing Required Fields",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{superAdminToken}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"userId\": \"{{testAdminId}}\",\n  \"action\": \"reject\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/onboard/process",
+              "host": ["{{baseUrl}}"],
+              "path": ["onboard", "process"]
+            }
+          }
+        },
+        {
+          "name": "Use Blacklisted Token",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{customerToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auth/me",
+              "host": ["{{baseUrl}}"],
+              "path": ["auth", "me"]
+            }
+          },
+          "description": "This should fail if token was used in logout test"
+        }
+      ]
+    },
+    {
+      "name": "5. Complete Test Flow",
+      "item": [
+        {
+          "name": "1. Create New User",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"testflow@example.com\",\n  \"name\": \"Test Flow User\",\n  \"role\": \"customer\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/auth/request-magic-link",
+              "host": ["{{baseUrl}}"],
+              "path": ["auth", "request-magic-link"]
+            }
+          }
+        },
+        {
+          "name": "2. Login User",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"token\": \"REPLACE_WITH_MAGIC_TOKEN\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/auth/verify-magic-link",
+              "host": ["{{baseUrl}}"],
+              "path": ["auth", "verify-magic-link"]
+            }
+          }
+        },
+        {
+          "name": "3. Check User Profile",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer USER_TOKEN_FROM_STEP_2"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auth/me",
+              "host": ["{{baseUrl}}"],
+              "path": ["auth", "me"]
+            }
+          }
+        },
+        {
+          "name": "4. Logout User",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer USER_TOKEN_FROM_STEP_2"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"reason\": \"manual\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/account/logout",
+              "host": ["{{baseUrl}}"],
+              "path": ["account", "logout"]
+            }
+          }
+        },
+        {
+          "name": "5. Try Using Logged Out Token",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer USER_TOKEN_FROM_STEP_2"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auth/me",
+              "host": ["{{baseUrl}}"],
+              "path": ["auth", "me"]
+            }
+          },
+          "description": "This should fail with token blacklisted error"
+        }
+      ]
+    }
+  ]
+}
