@@ -6,6 +6,7 @@ import dotenv from "dotenv";
 import authRoutes from "./routes/authRoutes";
 import onboardRoutes from "./routes/onboardRoutes";
 import accountRoutes from "./routes/accountRoutes"; // Add this import
+import productRoutes from "./routes/productRoutes"; // Add this import
 
 dotenv.config();
 
@@ -22,6 +23,7 @@ app.use(express.urlencoded({ extended: true }));
 app.use("/api/auth", authRoutes);
 app.use("/api/onboard", onboardRoutes);
 app.use("/api/account", accountRoutes); // Add this route
+app.use("/api/products", productRoutes); // Add this route
 
 // Health check
 app.get("/health", (req, res) => {
