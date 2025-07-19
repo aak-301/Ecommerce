@@ -10,7 +10,10 @@ const DB_CONFIG = {
   password: process.env.DB_PASSWORD,
 };
 
-const MIGRATION_FILE = "src/migrations/init.sql";
+const MIGRATION_FILES = {
+  init: "src/migrations/init.sql",
+  products: "src/migrations/products.sql",
+};
 
 function validateConfig() {
   if (!DB_CONFIG.user || !DB_CONFIG.database) {
@@ -58,47 +61,113 @@ function testConnection() {
 }
 
 function showStatus() {
-  console.log("📁 Migration file status:");
+  console.log("📁 Migration files status:");
 
-  if (existsSync(MIGRATION_FILE)) {
-    const stats = statSync(MIGRATION_FILE);
-    const sizeKB = (stats.size / 1024).toFixed(1);
-    console.log(`✅ ${MIGRATION_FILE} (${sizeKB}KB)`);
-  } else {
-    console.log(`❌ ${MIGRATION_FILE} not found`);
-  }
+  Object.entries(MIGRATION_FILES).forEach(([name, filePath]) => {
+    if (existsSync(filePath)) {
+      const stats = statSync(filePath);
+      const sizeKB = (stats.size / 1024).toFixed(1);
+      console.log(`✅ ${name}: ${filePath} (${sizeKB}KB)`);
+    } else {
+      console.log(`❌ ${name}: ${filePath} not found`);
+    }
+  });
+}
+
+function runSingleMigration(migrationFile, migrationName) {
+  return new Promise((resolve, reject) => {
+    if (!existsSync(migrationFile)) {
+      reject(new Error(`Migration file not found: ${migrationFile}`));
+      return;
+    }
+
+    console.log(`🚀 Running ${migrationName} migration...`);
+
+    const command = `psql -h ${DB_CONFIG.host} -p ${DB_CONFIG.port} -U ${DB_CONFIG.user} -d ${DB_CONFIG.database} -f ${migrationFile}`;
+    const env = { ...process.env, PGPASSWORD: DB_CONFIG.password };
+
+    exec(command, { env }, (error, stdout, stderr) => {
+      if (error) {
+        reject(
+          new Error(`${migrationName} migration failed: ${error.message}`)
+        );
+        return;
+      }
+
+      if (stderr) {
+        console.warn(`⚠️ Warning in ${migrationName}:`, stderr);
+      }
+
+      console.log(`✅ ${migrationName} migration completed`);
+      resolve();
+    });
+  });
 }
 
 async function runMigration() {
-  if (!existsSync(MIGRATION_FILE)) {
-    console.error("❌ Migration file not found:", MIGRATION_FILE);
-    process.exit(1);
-  }
-
   try {
     await createDatabase();
-  } catch (error) {
-    console.error("❌ Failed to create database:", error.message);
-    process.exit(1);
-  }
 
-  console.log("🚀 Running migration...");
+    console.log("\n🔄 Running all migrations in order...\n");
 
-  const command = `psql -h ${DB_CONFIG.host} -p ${DB_CONFIG.port} -U ${DB_CONFIG.user} -d ${DB_CONFIG.database} -f ${MIGRATION_FILE}`;
-  const env = { ...process.env, PGPASSWORD: DB_CONFIG.password };
-
-  exec(command, { env }, (error, stdout, stderr) => {
-    if (error) {
-      console.error("❌ Migration failed:", error.message);
+    // Run init migration first (authentication system)
+    if (existsSync(MIGRATION_FILES.init)) {
+      await runSingleMigration(MIGRATION_FILES.init, "Authentication System");
+    } else {
+      console.error(
+        `❌ Required init migration not found: ${MIGRATION_FILES.init}`
+      );
       process.exit(1);
     }
 
-    if (stderr) {
-      console.error("⚠️ Warning:", stderr);
+    // Run products migration second (if it exists)
+    if (existsSync(MIGRATION_FILES.products)) {
+      await runSingleMigration(MIGRATION_FILES.products, "Product Management");
+    } else {
+      console.warn(
+        `⚠️ Products migration not found: ${MIGRATION_FILES.products}`
+      );
+      console.warn("   Product management features will not be available.");
     }
 
-    console.log("✅ Migration completed");
-  });
+    console.log("\n🎉 All migrations completed successfully!");
+    console.log("\n📊 System Status:");
+    console.log("   ✓ Authentication & User Management");
+    console.log("   ✓ Admin Onboarding System");
+    console.log("   ✓ Account Management");
+
+    if (existsSync(MIGRATION_FILES.products)) {
+      console.log("   ✓ Product Management System");
+      console.log("   ✓ Inventory Management");
+      console.log("   ✓ Category Management");
+      console.log("   ✓ Bulk Operations & Excel Import");
+    }
+
+    console.log("\n🚀 Ready to start your application!");
+  } catch (error) {
+    console.error("❌ Migration failed:", error.message);
+    process.exit(1);
+  }
+}
+
+async function runSpecificMigration(migrationName) {
+  try {
+    await createDatabase();
+
+    if (!MIGRATION_FILES[migrationName]) {
+      console.error(`❌ Unknown migration: ${migrationName}`);
+      console.log(
+        "Available migrations:",
+        Object.keys(MIGRATION_FILES).join(", ")
+      );
+      process.exit(1);
+    }
+
+    await runSingleMigration(MIGRATION_FILES[migrationName], migrationName);
+  } catch (error) {
+    console.error("❌ Migration failed:", error.message);
+    process.exit(1);
+  }
 }
 
 // Handle command line arguments
@@ -112,6 +181,12 @@ switch (command) {
     break;
   case "status":
     showStatus();
+    break;
+  case "init":
+    runSpecificMigration("init");
+    break;
+  case "products":
+    runSpecificMigration("products");
     break;
   case "run":
   default:

@@ -1,0 +1,872 @@
+{
+  "info": {
+    "name": "Customer E-commerce API",
+    "description": "Complete Customer Shopping Experience API Collection",
+    "version": "2.0.0",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      {
+        "key": "token",
+        "value": "{{customer_jwt_token}}",
+        "type": "string"
+      }
+    ]
+  },
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "http://localhost:3000/api",
+      "type": "string"
+    },
+    {
+      "key": "customer_jwt_token",
+      "value": "your_customer_jwt_token_here",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "Authentication",
+      "item": [
+        {
+          "name": "Request Magic Link (Customer)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"customer@example.com\",\n  \"name\": \"Customer User\",\n  \"role\": \"customer\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/auth/request-magic-link",
+              "host": ["{{base_url}}"],
+              "path": ["auth", "request-magic-link"]
+            }
+          }
+        },
+        {
+          "name": "Verify Magic Link",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"token\": \"your_magic_token_here\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/auth/verify-magic-link",
+              "host": ["{{base_url}}"],
+              "path": ["auth", "verify-magic-link"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Product Browsing (Public)",
+      "item": [
+        {
+          "name": "Get All Products",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/customer/products?page=1&limit=20&sort_by=created_at&sort_order=desc",
+              "host": ["{{base_url}}"],
+              "path": ["customer", "products"],
+              "query": [
+                { "key": "page", "value": "1" },
+                { "key": "limit", "value": "20" },
+                { "key": "sort_by", "value": "created_at" },
+                { "key": "sort_order", "value": "desc" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Search Products",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/customer/products/search?q=electronics&page=1&limit=10",
+              "host": ["{{base_url}}"],
+              "path": ["customer", "products", "search"],
+              "query": [
+                { "key": "q", "value": "electronics" },
+                { "key": "page", "value": "1" },
+                { "key": "limit", "value": "10" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get Featured Products",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/customer/products/featured?limit=10",
+              "host": ["{{base_url}}"],
+              "path": ["customer", "products", "featured"],
+              "query": [{ "key": "limit", "value": "10" }]
+            }
+          }
+        },
+        {
+          "name": "Get Product Details",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/customer/products/{{product_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["customer", "products", "{{product_id}}"]
+            }
+          }
+        },
+        {
+          "name": "Get Product Reviews",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/customer/products/{{product_id}}/reviews?limit=20&offset=0",
+              "host": ["{{base_url}}"],
+              "path": ["customer", "products", "{{product_id}}", "reviews"],
+              "query": [
+                { "key": "limit", "value": "20" },
+                { "key": "offset", "value": "0" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get Related Products",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/customer/products/{{product_id}}/related?limit=8",
+              "host": ["{{base_url}}"],
+              "path": ["customer", "products", "{{product_id}}", "related"],
+              "query": [{ "key": "limit", "value": "8" }]
+            }
+          }
+        },
+        {
+          "name": "Get Categories",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/customer/categories",
+              "host": ["{{base_url}}"],
+              "path": ["customer", "categories"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Customer Profile",
+      "item": [
+        {
+          "name": "Get Customer Profile",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{customer_jwt_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/customer/profile",
+              "host": ["{{base_url}}"],
+              "path": ["customer", "profile"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Address Management",
+      "item": [
+        {
+          "name": "Create Address",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{customer_jwt_token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"type\": \"shipping\",\n  \"is_default\": true,\n  \"first_name\": \"John\",\n  \"last_name\": \"Doe\",\n  \"address_line_1\": \"123 Main Street\",\n  \"city\": \"Mumbai\",\n  \"state\": \"Maharashtra\",\n  \"postal_code\": \"400001\",\n  \"country\": \"India\",\n  \"phone\": \"9876543210\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/customer/addresses",
+              "host": ["{{base_url}}"],
+              "path": ["customer", "addresses"]
+            }
+          }
+        },
+        {
+          "name": "Get All Addresses",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{customer_jwt_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/customer/addresses",
+              "host": ["{{base_url}}"],
+              "path": ["customer", "addresses"]
+            }
+          }
+        },
+        {
+          "name": "Get Shipping Addresses",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{customer_jwt_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/customer/addresses?type=shipping",
+              "host": ["{{base_url}}"],
+              "path": ["customer", "addresses"],
+              "query": [{ "key": "type", "value": "shipping" }]
+            }
+          }
+        },
+        {
+          "name": "Update Address",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{customer_jwt_token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"first_name\": \"Jane\",\n  \"last_name\": \"Smith\",\n  \"phone\": \"9876543211\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/customer/addresses/{{address_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["customer", "addresses", "{{address_id}}"]
+            }
+          }
+        },
+        {
+          "name": "Delete Address",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{customer_jwt_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/customer/addresses/{{address_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["customer", "addresses", "{{address_id}}"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Shopping Cart",
+      "item": [
+        {
+          "name": "Add to Cart",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{customer_jwt_token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"product_id\": \"{{product_id}}\",\n  \"quantity\": 2\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/customer/cart/add",
+              "host": ["{{base_url}}"],
+              "path": ["customer", "cart", "add"]
+            }
+          }
+        },
+        {
+          "name": "Add Variant to Cart",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{customer_jwt_token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"product_id\": \"{{product_id}}\",\n  \"variant_id\": \"{{variant_id}}\",\n  \"quantity\": 1\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/customer/cart/add",
+              "host": ["{{base_url}}"],
+              "path": ["customer", "cart", "add"]
+            }
+          }
+        },
+        {
+          "name": "Get Cart",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{customer_jwt_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/customer/cart",
+              "host": ["{{base_url}}"],
+              "path": ["customer", "cart"]
+            }
+          }
+        },
+        {
+          "name": "Update Cart Item",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{customer_jwt_token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"quantity\": 3\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/customer/cart/items/{{product_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["customer", "cart", "items", "{{product_id}}"]
+            }
+          }
+        },
+        {
+          "name": "Update Cart Item with Variant",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{customer_jwt_token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"quantity\": 2\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/customer/cart/items/{{product_id}}?variantId={{variant_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["customer", "cart", "items", "{{product_id}}"],
+              "query": [{ "key": "variantId", "value": "{{variant_id}}" }]
+            }
+          }
+        },
+        {
+          "name": "Remove from Cart",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{customer_jwt_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/customer/cart/items/{{product_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["customer", "cart", "items", "{{product_id}}"]
+            }
+          }
+        },
+        {
+          "name": "Clear Cart",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{customer_jwt_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/customer/cart/clear",
+              "host": ["{{base_url}}"],
+              "path": ["customer", "cart", "clear"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Order Management",
+      "item": [
+        {
+          "name": "Place Order",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{customer_jwt_token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"shipping_address_id\": \"{{shipping_address_id}}\",\n  \"billing_address_id\": \"{{billing_address_id}}\",\n  \"payment_method\": \"upi\",\n  \"customer_notes\": \"Please handle with care\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/customer/orders",
+              "host": ["{{base_url}}"],
+              "path": ["customer", "orders"]
+            }
+          }
+        },
+        {
+          "name": "Get Order History",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{customer_jwt_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/customer/orders?page=1&limit=20&sort_by=created_at&sort_order=desc",
+              "host": ["{{base_url}}"],
+              "path": ["customer", "orders"],
+              "query": [
+                { "key": "page", "value": "1" },
+                { "key": "limit", "value": "20" },
+                { "key": "sort_by", "value": "created_at" },
+                { "key": "sort_order", "value": "desc" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get Orders by Status",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{customer_jwt_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/customer/orders?status=pending&payment_status=pending",
+              "host": ["{{base_url}}"],
+              "path": ["customer", "orders"],
+              "query": [
+                { "key": "status", "value": "pending" },
+                { "key": "payment_status", "value": "pending" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get Order Details",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{customer_jwt_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/customer/orders/{{order_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["customer", "orders", "{{order_id}}"]
+            }
+          }
+        },
+        {
+          "name": "Cancel Order",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{customer_jwt_token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"reason\": \"Changed my mind\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/customer/orders/{{order_id}}/cancel",
+              "host": ["{{base_url}}"],
+              "path": ["customer", "orders", "{{order_id}}", "cancel"]
+            }
+          }
+        },
+        {
+          "name": "Get Order Statistics",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{customer_jwt_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/customer/orders/stats/summary",
+              "host": ["{{base_url}}"],
+              "path": ["customer", "orders", "stats", "summary"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Product Reviews",
+      "item": [
+        {
+          "name": "Create Review",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{customer_jwt_token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"product_id\": \"{{product_id}}\",\n  \"rating\": 5,\n  \"title\": \"Excellent Product!\",\n  \"review_text\": \"This product exceeded my expectations. Great quality and fast delivery.\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/customer/reviews",
+              "host": ["{{base_url}}"],
+              "path": ["customer", "reviews"]
+            }
+          }
+        },
+        {
+          "name": "Create Review with Order",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{customer_jwt_token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"product_id\": \"{{product_id}}\",\n  \"order_id\": \"{{order_id}}\",\n  \"rating\": 4,\n  \"title\": \"Good Product\",\n  \"review_text\": \"Product as described. Good value for money.\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/customer/reviews",
+              "host": ["{{base_url}}"],
+              "path": ["customer", "reviews"]
+            }
+          }
+        },
+        {
+          "name": "Get My Reviews",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{customer_jwt_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/customer/reviews?limit=50&offset=0",
+              "host": ["{{base_url}}"],
+              "path": ["customer", "reviews"],
+              "query": [
+                { "key": "limit", "value": "50" },
+                { "key": "offset", "value": "0" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Update Review",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{customer_jwt_token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"rating\": 5,\n  \"title\": \"Updated Review Title\",\n  \"review_text\": \"Updated review text with more details.\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/customer/reviews/{{review_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["customer", "reviews", "{{review_id}}"]
+            }
+          }
+        },
+        {
+          "name": "Delete Review",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{customer_jwt_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/customer/reviews/{{review_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["customer", "reviews", "{{review_id}}"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Wishlist",
+      "item": [
+        {
+          "name": "Add to Wishlist",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{customer_jwt_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/customer/wishlist/{{product_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["customer", "wishlist", "{{product_id}}"]
+            }
+          }
+        },
+        {
+          "name": "Get Wishlist",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{customer_jwt_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/customer/wishlist",
+              "host": ["{{base_url}}"],
+              "path": ["customer", "wishlist"]
+            }
+          }
+        },
+        {
+          "name": "Remove from Wishlist",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{customer_jwt_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/customer/wishlist/{{product_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["customer", "wishlist", "{{product_id}}"]
+            }
+          }
+        },
+        {
+          "name": "Check Wishlist Status",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{customer_jwt_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/customer/wishlist/{{product_id}}/status",
+              "host": ["{{base_url}}"],
+              "path": ["customer", "wishlist", "{{product_id}}", "status"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Advanced Product Search",
+      "item": [
+        {
+          "name": "Filter by Category and Price",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/customer/products?category_id={{category_id}}&min_price=50&max_price=500&in_stock=true",
+              "host": ["{{base_url}}"],
+              "path": ["customer", "products"],
+              "query": [
+                { "key": "category_id", "value": "{{category_id}}" },
+                { "key": "min_price", "value": "50" },
+                { "key": "max_price", "value": "500" },
+                { "key": "in_stock", "value": "true" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Filter by Tags",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/customer/products?tags=electronics,gadget&sort_by=rating&sort_order=desc",
+              "host": ["{{base_url}}"],
+              "path": ["customer", "products"],
+              "query": [
+                { "key": "tags", "value": "electronics,gadget" },
+                { "key": "sort_by", "value": "rating" },
+                { "key": "sort_order", "value": "desc" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Search with Filters",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/customer/products/search?q=smartphone&category_id={{category_id}}&min_price=100&max_price=1000&in_stock=true&sort_by=price&sort_order=asc",
+              "host": ["{{base_url}}"],
+              "path": ["customer", "products", "search"],
+              "query": [
+                { "key": "q", "value": "smartphone" },
+                { "key": "category_id", "value": "{{category_id}}" },
+                { "key": "min_price", "value": "100" },
+                { "key": "max_price", "value": "1000" },
+                { "key": "in_stock", "value": "true" },
+                { "key": "sort_by", "value": "price" },
+                { "key": "sort_order", "value": "asc" }
+              ]
+            }
+          }
+        }
+      ]
+    }
+  ],
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "// Auto-set variables from previous requests",
+          "// You can set these in Tests tab of login requests:",
+          "// pm.globals.set('customer_jwt_token', pm.response.json().data.token);",
+          "// pm.globals.set('product_id', 'your-product-id');",
+          "// pm.globals.set('order_id', 'your-order-id');",
+          ""
+        ]
+      }
+    }
+  ]
+}

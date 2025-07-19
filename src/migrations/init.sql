@@ -82,7 +82,6 @@ CREATE TABLE IF NOT EXISTS deleted_accounts (
     user_data JSONB
 );
 
-
 -- Drop all variations of the function
 DROP FUNCTION IF EXISTS soft_delete_user CASCADE;
 DROP FUNCTION IF EXISTS restore_deleted_user CASCADE;
@@ -274,9 +273,7 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
-
 -- Function to permanently delete user (hard delete - use with caution)
-
 CREATE OR REPLACE FUNCTION hard_delete_user(user_id_param UUID)
 RETURNS BOOLEAN AS $$
 DECLARE
@@ -296,8 +293,6 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
-
-
 -- Function to restore soft deleted user
 CREATE OR REPLACE FUNCTION restore_deleted_user(user_id_param UUID)
 RETURNS BOOLEAN AS $$
@@ -316,7 +311,6 @@ BEGIN
     RETURN restoration_successful;
 END;
 $$ LANGUAGE plpgsql;
-
 
 -- Function to check if token is blacklisted
 CREATE OR REPLACE FUNCTION is_token_blacklisted(token_hash_param VARCHAR(255))
@@ -409,6 +403,47 @@ END;
 $$ LANGUAGE plpgsql;
 
 -- =============================================
+-- CUSTOMER-SPECIFIC FUNCTIONS
+-- =============================================
+
+-- Function to handle customer account cleanup on deletion
+CREATE OR REPLACE FUNCTION cleanup_customer_data(user_id_param UUID)
+RETURNS INTEGER AS $$
+DECLARE
+    cleanup_count INTEGER := 0;
+BEGIN
+    -- Archive customer data before deletion
+    INSERT INTO deleted_accounts (
+        original_user_id,
+        deletion_reason,
+        user_data,
+        created_at
+    )
+    SELECT 
+        user_id_param,
+        'customer_data_cleanup',
+        jsonb_build_object(
+            'addresses_count', (SELECT COUNT(*) FROM customer_addresses WHERE customer_id = user_id_param),
+            'orders_count', (SELECT COUNT(*) FROM orders WHERE customer_id = user_id_param),
+            'cart_items_count', (SELECT COUNT(*) FROM shopping_cart WHERE customer_id = user_id_param),
+            'reviews_count', (SELECT COUNT(*) FROM product_reviews WHERE customer_id = user_id_param),
+            'wishlist_count', (SELECT COUNT(*) FROM wishlists WHERE customer_id = user_id_param),
+            'cleanup_timestamp', NOW()
+        ),
+        NOW()
+    WHERE EXISTS (SELECT 1 FROM users WHERE id = user_id_param);
+    
+    -- Customer data will be automatically deleted due to CASCADE constraints
+    -- But we can get the count first for reporting
+    SELECT COUNT(*) INTO cleanup_count
+    FROM customer_addresses 
+    WHERE customer_id = user_id_param;
+    
+    RETURN cleanup_count;
+END;
+$$ LANGUAGE plpgsql;
+
+-- =============================================
 -- VIEWS FOR REPORTING
 -- =============================================
 
@@ -423,6 +458,7 @@ SELECT
     (SELECT COUNT(*) FROM users WHERE deleted_at IS NOT NULL) as total_deleted_users,
     (SELECT COUNT(*) FROM users WHERE role = 'admin' AND status = 'pending' AND deleted_at IS NULL) as pending_admins,
     (SELECT COUNT(*) FROM users WHERE role = 'admin' AND status = 'active' AND deleted_at IS NULL) as active_admins,
+    (SELECT COUNT(*) FROM users WHERE role = 'customer' AND deleted_at IS NULL) as total_customers,
     (SELECT COUNT(*) FROM logout_sessions WHERE created_at > NOW() - INTERVAL '24 hours') as logouts_last_24h,
     (SELECT COUNT(*) FROM deleted_accounts WHERE deleted_at > NOW() - INTERVAL '30 days') as deletions_last_30d;
 
@@ -480,6 +516,14 @@ LEFT JOIN users db ON da.deleted_by = db.id
 
 ORDER BY created_at DESC;
 
+-- View for customer statistics
+CREATE OR REPLACE VIEW customer_stats AS
+SELECT 
+    (SELECT COUNT(*) FROM users WHERE role = 'customer' AND deleted_at IS NULL) as total_customers,
+    (SELECT COUNT(*) FROM users WHERE role = 'customer' AND deleted_at IS NULL AND created_at > NOW() - INTERVAL '30 days') as new_customers_last_30d,
+    (SELECT COUNT(*) FROM users WHERE role = 'customer' AND deleted_at IS NULL AND created_at > NOW() - INTERVAL '7 days') as new_customers_last_7d,
+    (SELECT COUNT(DISTINCT customer_id) FROM orders WHERE created_at > NOW() - INTERVAL '30 days') as active_customers_last_30d;
+
 -- =============================================
 -- DEFAULT DATA
 -- =============================================
@@ -489,12 +533,17 @@ INSERT INTO users (email, name, role, status)
 VALUES ('superadmin@example.com', 'Super Admin', 'super_admin', 'active')
 ON CONFLICT (email) DO NOTHING;
 
+-- Insert sample customer for testing (optional)
+INSERT INTO users (email, name, role, status) 
+VALUES ('customer@example.com', 'Test Customer', 'customer', 'active')
+ON CONFLICT (email) DO NOTHING;
+
 -- =============================================
 -- VERIFICATION AND COMPLETION
 -- =============================================
 
 -- Verify all tables exist
-DO $$
+DO $
 DECLARE
     table_count INTEGER;
 BEGIN
@@ -508,10 +557,10 @@ BEGIN
     ELSE
         RAISE WARNING 'WARNING: Missing tables! Expected 5, found %', table_count;
     END IF;
-END $$;
+END $;
 
 -- Verify all functions exist
-DO $$
+DO $
 DECLARE
     function_count INTEGER;
 BEGIN
@@ -530,32 +579,33 @@ BEGIN
         'cleanup_old_logout_sessions',
         'cleanup_expired_tokens',
         'get_account_deletion_stats',
-        'get_user_activity_summary'
+        'get_user_activity_summary',
+        'cleanup_customer_data'
     );
     
-    IF function_count >= 12 THEN
+    IF function_count >= 13 THEN
         RAISE NOTICE 'SUCCESS: All required functions created (%)!', function_count;
     ELSE
-        RAISE WARNING 'WARNING: Missing functions! Expected 12+, found %', function_count;
+        RAISE WARNING 'WARNING: Missing functions! Expected 13+, found %', function_count;
     END IF;
-END $$;
+END $;
 
 -- Verify all views exist
-DO $$
+DO $
 DECLARE
     view_count INTEGER;
 BEGIN
     SELECT COUNT(*) INTO view_count 
     FROM information_schema.views 
     WHERE table_schema = 'public' 
-    AND table_name IN ('active_users', 'admin_dashboard_stats', 'audit_trail');
+    AND table_name IN ('active_users', 'admin_dashboard_stats', 'audit_trail', 'customer_stats');
     
-    IF view_count = 3 THEN
+    IF view_count = 4 THEN
         RAISE NOTICE 'SUCCESS: All required views created (%)!', view_count;
     ELSE
-        RAISE WARNING 'WARNING: Missing views! Expected 3, found %', view_count;
+        RAISE WARNING 'WARNING: Missing views! Expected 4, found %', view_count;
     END IF;
-END $$;
+END $;
 
 SELECT 
     'soft_delete_user' as function_name,
@@ -567,52 +617,4 @@ WHERE proname = 'soft_delete_user';
 SELECT 'All functions recreated successfully!' as status;
 
 -- Final success message
-RAISE NOTICE '';
-RAISE NOTICE '🎉 Complete Authentication System Initialized Successfully!';
-RAISE NOTICE '================================================================';
-RAISE NOTICE '';
-RAISE NOTICE '📊 Created Tables (5):';
-RAISE NOTICE '   ✓ users (with onboarding & soft delete fields)';
-RAISE NOTICE '   ✓ magic_tokens';
-RAISE NOTICE '   ✓ onboarding_history';
-RAISE NOTICE '   ✓ logout_sessions';
-RAISE NOTICE '   ✓ deleted_accounts';
-RAISE NOTICE '';
-RAISE NOTICE '⚡ Created Functions (12+):';
-RAISE NOTICE '   ✓ Authentication functions';
-RAISE NOTICE '   ✓ Onboarding management functions';
-RAISE NOTICE '   ✓ Account deletion functions';
-RAISE NOTICE '   ✓ Logout tracking functions';
-RAISE NOTICE '   ✓ Cleanup & maintenance functions';
-RAISE NOTICE '';
-RAISE NOTICE '📈 Created Views (3):';
-RAISE NOTICE '   ✓ active_users';
-RAISE NOTICE '   ✓ admin_dashboard_stats';
-RAISE NOTICE '   ✓ audit_trail';
-RAISE NOTICE '';
-RAISE NOTICE '🔥 Complete Feature Set Available:';
-RAISE NOTICE '   ✓ Magic link authentication';
-RAISE NOTICE '   ✓ Role-based access control (super_admin, admin, customer)';
-RAISE NOTICE '   ✓ Admin onboarding workflow';
-RAISE NOTICE '   ✓ Account deletion & restoration';
-RAISE NOTICE '   ✓ Logout session tracking';
-RAISE NOTICE '   ✓ JWT token blacklisting';
-RAISE NOTICE '   ✓ Comprehensive audit trails';
-RAISE NOTICE '   ✓ Real-time analytics dashboard';
-RAISE NOTICE '';
-RAISE NOTICE '📝 Next Steps:';
-RAISE NOTICE '   1. Update your application code with new types';
-RAISE NOTICE '   2. Configure email settings in .env';
-RAISE NOTICE '   3. Test with Postman collections';
-RAISE NOTICE '   4. Start building your application: npm run dev';
-RAISE NOTICE '';
-RAISE NOTICE '🧹 Maintenance Commands:';
-RAISE NOTICE '   SELECT cleanup_expired_tokens();';
-RAISE NOTICE '   SELECT cleanup_old_logout_sessions(30);';
-RAISE NOTICE '';
-RAISE NOTICE '📊 Test Your Setup:';
-RAISE NOTICE '   SELECT * FROM admin_dashboard_stats;';
-RAISE NOTICE '   SELECT get_pending_admins_count();';
-RAISE NOTICE '';
-RAISE NOTICE '🚀 Ready to rock! Your complete authentication system is live!';
-RAISE NOTICE '================================================================';
+RAISE NOTICE '🎉 Complete Authentication System with Customer Support Initialized!';

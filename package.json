@@ -1,7 +1,7 @@
 {
-  "name": "auth-system",
-  "version": "1.0.0",
-  "description": "Authentication system with magic link signup/login",
+  "name": "complete-ecommerce-system",
+  "version": "2.0.0",
+  "description": "Complete E-commerce System: Authentication, Product Management & Customer Features with magic link signup/login",
   "main": "dist/server.js",
   "scripts": {
     "start": "node dist/server.js",
@@ -10,9 +10,28 @@
     "migrate": "node migrate.js",
     "migrate:test": "node migrate.js test",
     "migrate:status": "node migrate.js status",
+    "migrate:init": "node migrate.js init",
+    "migrate:products": "node migrate.js products",
     "db:setup": "npm run migrate",
-    "db:reset": "npm run migrate"
+    "db:reset": "npm run migrate",
+    "db:init": "npm run migrate:init",
+    "db:products": "npm run migrate:products"
   },
+  "keywords": [
+    "nodejs",
+    "express",
+    "typescript",
+    "postgresql",
+    "ecommerce",
+    "authentication",
+    "magic-link",
+    "shopping-cart",
+    "orders",
+    "product-management",
+    "inventory",
+    "reviews",
+    "wishlist"
+  ],
   "dependencies": {
     "@magic-sdk/admin": "^2.4.1",
     "bcryptjs": "^2.4.3",
@@ -23,15 +42,18 @@
     "helmet": "^7.1.0",
     "joi": "^17.11.0",
     "jsonwebtoken": "^9.0.2",
+    "multer": "^1.4.5-lts.1",
     "nodemailer": "^6.9.7",
     "pg": "^8.11.3",
-    "uuid": "^9.0.1"
+    "uuid": "^9.0.1",
+    "xlsx": "^0.18.5"
   },
   "devDependencies": {
     "@types/bcryptjs": "^2.4.6",
     "@types/cors": "^2.8.17",
     "@types/express": "^4.17.21",
     "@types/jsonwebtoken": "^9.0.5",
+    "@types/multer": "^1.4.11",
     "@types/nodemailer": "^6.4.14",
     "@types/pg": "^8.10.9",
     "@types/uuid": "^9.0.7",
@@ -39,5 +61,15 @@
     "nodemon": "^3.0.2",
     "ts-node": "^10.9.1",
     "typescript": "^5.3.3"
-  }
+  },
+  "engines": {
+    "node": ">=16.0.0",
+    "npm": ">=8.0.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "your-repository-url"
+  },
+  "author": "Your Name",
+  "license": "MIT"
 }
