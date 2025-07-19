@@ -1,0 +1,1479 @@
+{
+  "info": {
+    "name": "Complete E-commerce System API",
+    "description": "Comprehensive API collection for Authentication, Admin Product Management, and Customer Shopping Experience",
+    "version": "3.0.0",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:3000/api",
+      "type": "string"
+    },
+    {
+      "key": "superAdminToken",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "adminToken",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "customerToken",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "testAdminId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "testCustomerId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "testProductId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "testCategoryId",
+      "value": "",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "🔐 Authentication System",
+      "item": [
+        {
+          "name": "Setup - Request Magic Links",
+          "item": [
+            {
+              "name": "Request Magic Link (Super Admin)",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"email\": \"superadmin@example.com\",\n  \"name\": \"Super Admin\",\n  \"role\": \"super_admin\"\n}"
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/auth/request-magic-link",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["auth", "request-magic-link"]
+                }
+              }
+            },
+            {
+              "name": "Request Magic Link (Admin)",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"email\": \"admin@example.com\",\n  \"name\": \"Test Admin\",\n  \"role\": \"admin\"\n}"
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/auth/request-magic-link",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["auth", "request-magic-link"]
+                }
+              }
+            },
+            {
+              "name": "Request Magic Link (Customer)",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"email\": \"customer@example.com\",\n  \"name\": \"Test Customer\",\n  \"role\": \"customer\"\n}"
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/auth/request-magic-link",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["auth", "request-magic-link"]
+                }
+              }
+            }
+          ]
+        },
+        {
+          "name": "Login - Verify Magic Links",
+          "item": [
+            {
+              "name": "Verify Magic Link (Super Admin)",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"token\": \"PASTE_SUPER_ADMIN_MAGIC_TOKEN_HERE\"\n}"
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/auth/verify-magic-link",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["auth", "verify-magic-link"]
+                }
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "exec": [
+                      "if (pm.response.to.have.status(200)) {",
+                      "    const responseJson = pm.response.json();",
+                      "    if (responseJson.data && responseJson.data.token) {",
+                      "        pm.collectionVariables.set('superAdminToken', responseJson.data.token);",
+                      "        console.log('✅ Super Admin token saved');",
+                      "    }",
+                      "}"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "Verify Magic Link (Admin)",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"token\": \"PASTE_ADMIN_MAGIC_TOKEN_HERE\"\n}"
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/auth/verify-magic-link",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["auth", "verify-magic-link"]
+                }
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "exec": [
+                      "if (pm.response.to.have.status(200)) {",
+                      "    const responseJson = pm.response.json();",
+                      "    if (responseJson.data && responseJson.data.token) {",
+                      "        pm.collectionVariables.set('adminToken', responseJson.data.token);",
+                      "        console.log('✅ Admin token saved');",
+                      "        if (responseJson.data.user && responseJson.data.user.id) {",
+                      "            pm.collectionVariables.set('testAdminId', responseJson.data.user.id);",
+                      "            console.log('✅ Admin ID saved');",
+                      "        }",
+                      "    }",
+                      "}"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "Verify Magic Link (Customer)",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"token\": \"PASTE_CUSTOMER_MAGIC_TOKEN_HERE\"\n}"
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/auth/verify-magic-link",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["auth", "verify-magic-link"]
+                }
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "exec": [
+                      "if (pm.response.to.have.status(200)) {",
+                      "    const responseJson = pm.response.json();",
+                      "    if (responseJson.data && responseJson.data.token) {",
+                      "        pm.collectionVariables.set('customerToken', responseJson.data.token);",
+                      "        console.log('✅ Customer token saved');",
+                      "        if (responseJson.data.user && responseJson.data.user.id) {",
+                      "            pm.collectionVariables.set('testCustomerId', responseJson.data.user.id);",
+                      "            console.log('✅ Customer ID saved');",
+                      "        }",
+                      "    }",
+                      "}"
+                    ]
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "name": "Profile Management",
+          "item": [
+            {
+              "name": "Get Current User (Super Admin)",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{superAdminToken}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/auth/me",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["auth", "me"]
+                }
+              }
+            },
+            {
+              "name": "Get Current User (Admin)",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{adminToken}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/auth/me",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["auth", "me"]
+                }
+              }
+            },
+            {
+              "name": "Get Current User (Customer)",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{customerToken}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/auth/me",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["auth", "me"]
+                }
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "👥 Admin Onboarding Management",
+      "item": [
+        {
+          "name": "Statistics & Overview",
+          "item": [
+            {
+              "name": "Get Onboarding Stats",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{superAdminToken}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/onboard/stats",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["onboard", "stats"]
+                }
+              }
+            },
+            {
+              "name": "Get Pending Admins Count",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{superAdminToken}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/onboard/pending/count",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["onboard", "pending", "count"]
+                }
+              }
+            }
+          ]
+        },
+        {
+          "name": "Admin Management",
+          "item": [
+            {
+              "name": "Get All Pending Admins",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{superAdminToken}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/onboard/pending",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["onboard", "pending"]
+                }
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "exec": [
+                      "if (pm.response.to.have.status(200)) {",
+                      "    const responseJson = pm.response.json();",
+                      "    if (responseJson.data && responseJson.data.admins && responseJson.data.admins.length > 0) {",
+                      "        pm.collectionVariables.set('testAdminId', responseJson.data.admins[0].id);",
+                      "        console.log('✅ Test Admin ID updated from pending admins');",
+                      "    }",
+                      "}"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "Get All Admins",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{superAdminToken}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/onboard/admins?limit=20",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["onboard", "admins"],
+                  "query": [
+                    {
+                      "key": "limit",
+                      "value": "20"
+                    }
+                  ]
+                }
+              }
+            },
+            {
+              "name": "Get Admin by ID",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{superAdminToken}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/onboard/admins/{{testAdminId}}",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["onboard", "admins", "{{testAdminId}}"]
+                }
+              }
+            }
+          ]
+        },
+        {
+          "name": "Onboarding Actions",
+          "item": [
+            {
+              "name": "Approve Admin",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{superAdminToken}}"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"userId\": \"{{testAdminId}}\",\n  \"action\": \"approve\",\n  \"notes\": \"Approved by super admin for testing\"\n}"
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/onboard/process",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["onboard", "process"]
+                }
+              }
+            },
+            {
+              "name": "Reject Admin",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{superAdminToken}}"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"userId\": \"{{testAdminId}}\",\n  \"action\": \"reject\",\n  \"reason\": \"Application does not meet requirements\",\n  \"notes\": \"Please reapply with proper documentation\"\n}"
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/onboard/process",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["onboard", "process"]
+                }
+              }
+            },
+            {
+              "name": "Suspend Admin",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{superAdminToken}}"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"userId\": \"{{testAdminId}}\",\n  \"action\": \"suspend\",\n  \"reason\": \"Policy violation detected\",\n  \"notes\": \"Account suspended pending investigation\"\n}"
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/onboard/process",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["onboard", "process"]
+                }
+              }
+            },
+            {
+              "name": "Reactivate Admin",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{superAdminToken}}"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"userId\": \"{{testAdminId}}\",\n  \"notes\": \"Investigation completed, account reactivated\"\n}"
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/onboard/reactivate",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["onboard", "reactivate"]
+                }
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "🔒 Account Management",
+      "item": [
+        {
+          "name": "Session Management",
+          "item": [
+            {
+              "name": "Logout (Manual)",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{customerToken}}"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"reason\": \"manual\"\n}"
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/account/logout",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["account", "logout"]
+                }
+              }
+            },
+            {
+              "name": "Logout (Security)",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{adminToken}}"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"reason\": \"security\"\n}"
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/account/logout",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["account", "logout"]
+                }
+              }
+            },
+            {
+              "name": "Get Logout History",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{customerToken}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/account/logout-history?limit=10",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["account", "logout-history"],
+                  "query": [
+                    {
+                      "key": "limit",
+                      "value": "10"
+                    }
+                  ]
+                }
+              }
+            },
+            {
+              "name": "Check Token Status",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{customerToken}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/account/token-status",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["account", "token-status"]
+                }
+              }
+            }
+          ]
+        },
+        {
+          "name": "Account Deletion",
+          "item": [
+            {
+              "name": "Self Delete Account",
+              "request": {
+                "method": "DELETE",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{customerToken}}"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"reason\": \"No longer need this service\",\n  \"feedback\": \"App was great but switching to different solution\"\n}"
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/account/delete",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["account", "delete"]
+                }
+              }
+            },
+            {
+              "name": "Admin Delete Account",
+              "request": {
+                "method": "DELETE",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{superAdminToken}}"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"userId\": \"{{testCustomerId}}\",\n  \"reason\": \"policy_violation\",\n  \"notes\": \"Account deleted due to spam activity\"\n}"
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/account/admin/delete",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["account", "admin", "delete"]
+                }
+              }
+            },
+            {
+              "name": "Restore Deleted Account",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{superAdminToken}}"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"userId\": \"{{testCustomerId}}\"\n}"
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/account/admin/restore",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["account", "admin", "restore"]
+                }
+              }
+            }
+          ]
+        },
+        {
+          "name": "Admin Operations",
+          "item": [
+            {
+              "name": "Force Logout User",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{superAdminToken}}"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"userId\": \"{{testCustomerId}}\",\n  \"reason\": \"Security investigation in progress\"\n}"
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/account/admin/force-logout",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["account", "admin", "force-logout"]
+                }
+              }
+            },
+            {
+              "name": "Get User by ID",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{superAdminToken}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/account/admin/users/{{testCustomerId}}",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["account", "admin", "users", "{{testCustomerId}}"]
+                }
+              }
+            },
+            {
+              "name": "Get Deleted Accounts",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{superAdminToken}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/account/admin/deleted?limit=20",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["account", "admin", "deleted"],
+                  "query": [
+                    {
+                      "key": "limit",
+                      "value": "20"
+                    }
+                  ]
+                }
+              }
+            },
+            {
+              "name": "Get Account Deletion Stats",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{superAdminToken}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/account/admin/deletion-stats",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["account", "admin", "deletion-stats"]
+                }
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "🛍️ Product Management (Admin)",
+      "item": [
+        {
+          "name": "Category Management",
+          "item": [
+            {
+              "name": "Create Category",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{adminToken}}"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"name\": \"Electronics\",\n  \"description\": \"Electronic devices and gadgets\",\n  \"is_active\": true\n}"
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/products/categories",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["products", "categories"]
+                }
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "exec": [
+                      "if (pm.response.to.have.status(201)) {",
+                      "    const responseJson = pm.response.json();",
+                      "    if (responseJson.data && responseJson.data.category && responseJson.data.category.id) {",
+                      "        pm.collectionVariables.set('testCategoryId', responseJson.data.category.id);",
+                      "        console.log('✅ Test Category ID saved: ' + responseJson.data.category.id);",
+                      "    }",
+                      "}"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "Get All Categories",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/products/categories",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["products", "categories"]
+                }
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "exec": [
+                      "if (pm.response.to.have.status(200)) {",
+                      "    const responseJson = pm.response.json();",
+                      "    if (responseJson.data && responseJson.data.categories && responseJson.data.categories.length > 0) {",
+                      "        const firstCategory = responseJson.data.categories[0];",
+                      "        if (firstCategory.id && !pm.collectionVariables.get('testCategoryId')) {",
+                      "            pm.collectionVariables.set('testCategoryId', firstCategory.id);",
+                      "            console.log('✅ Test Category ID saved from existing categories: ' + firstCategory.id);",
+                      "        }",
+                      "    }",
+                      "}"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "Update Category",
+              "request": {
+                "method": "PUT",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{adminToken}}"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"name\": \"Updated Electronics\",\n  \"description\": \"Updated description for electronics\"\n}"
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/products/categories/{{testCategoryId}}",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["products", "categories", "{{testCategoryId}}"]
+                }
+              }
+            },
+            {
+              "name": "Delete Category",
+              "request": {
+                "method": "DELETE",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{adminToken}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/products/categories/{{testCategoryId}}",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["products", "categories", "{{testCategoryId}}"]
+                }
+              }
+            }
+          ]
+        },
+        {
+          "name": "Product CRUD",
+          "item": [
+            {
+              "name": "Create Product",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{adminToken}}"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"name\": \"Sample Smartphone\",\n  \"description\": \"High-quality smartphone with excellent features\",\n  \"short_description\": \"Premium smartphone for everyday use\",\n  \"category_id\": \"{{testCategoryId}}\",\n  \"price\": 599.99,\n  \"sale_price\": 499.99,\n  \"quantity\": 100,\n  \"min_quantity\": 10,\n  \"status\": \"active\",\n  \"is_featured\": true,\n  \"tags\": [\"electronics\", \"smartphone\", \"mobile\"],\n  \"featured_image\": \"https://example.com/smartphone.jpg\",\n  \"weight\": 0.2,\n  \"attributes\": [\n    {\"name\": \"Color\", \"value\": \"Black\"},\n    {\"name\": \"Storage\", \"value\": \"128GB\"},\n    {\"name\": \"Brand\", \"value\": \"TechCorp\"}\n  ]\n}"
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/products",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["products"]
+                }
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "exec": [
+                      "if (pm.response.to.have.status(201)) {",
+                      "    const responseJson = pm.response.json();",
+                      "    if (responseJson.data && responseJson.data.product && responseJson.data.product.id) {",
+                      "        pm.collectionVariables.set('testProductId', responseJson.data.product.id);",
+                      "        console.log('✅ Test Product ID saved: ' + responseJson.data.product.id);",
+                      "    }",
+                      "}"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "Get All Products",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{adminToken}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/products?page=1&limit=20&status=active&sort_by=created_at&sort_order=desc",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["products"],
+                  "query": [
+                    { "key": "page", "value": "1" },
+                    { "key": "limit", "value": "20" },
+                    { "key": "status", "value": "active" },
+                    { "key": "sort_by", "value": "created_at" },
+                    { "key": "sort_order", "value": "desc" }
+                  ]
+                }
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "exec": [
+                      "if (pm.response.to.have.status(200)) {",
+                      "    const responseJson = pm.response.json();",
+                      "    if (responseJson.data && responseJson.data.products && responseJson.data.products.length > 0) {",
+                      "        const firstProduct = responseJson.data.products[0];",
+                      "        if (firstProduct.id && !pm.collectionVariables.get('testProductId')) {",
+                      "            pm.collectionVariables.set('testProductId', firstProduct.id);",
+                      "            console.log('✅ Test Product ID saved from existing products: ' + firstProduct.id);",
+                      "        }",
+                      "    }",
+                      "}"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "Get Product by ID",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{adminToken}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/products/{{testProductId}}",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["products", "{{testProductId}}"]
+                }
+              }
+            },
+            {
+              "name": "Update Product",
+              "request": {
+                "method": "PUT",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{adminToken}}"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"name\": \"Updated Smartphone\",\n  \"price\": 649.99,\n  \"quantity\": 150,\n  \"status\": \"active\"\n}"
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/products/{{testProductId}}",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["products", "{{testProductId}}"]
+                }
+              }
+            },
+            {
+              "name": "Search Products",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{adminToken}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/products?search=smartphone&category_id={{testCategoryId}}&min_price=100&max_price=1000",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["products"],
+                  "query": [
+                    { "key": "search", "value": "smartphone" },
+                    { "key": "category_id", "value": "{{testCategoryId}}" },
+                    { "key": "min_price", "value": "100" },
+                    { "key": "max_price", "value": "1000" }
+                  ]
+                }
+              }
+            },
+            {
+              "name": "Delete Product (Soft Delete)",
+              "request": {
+                "method": "DELETE",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{adminToken}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/products/{{testProductId}}",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["products", "{{testProductId}}"]
+                }
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "📦 Inventory & Bulk Operations",
+      "item": [
+        {
+          "name": "Inventory Management",
+          "item": [
+            {
+              "name": "Update Single Product Inventory",
+              "request": {
+                "method": "PATCH",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{adminToken}}"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"product_id\": \"{{testProductId}}\",\n  \"quantity_change\": 50,\n  \"change_type\": \"stock_in\",\n  \"reason\": \"New stock received from supplier\"\n}"
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/products/inventory/update",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["products", "inventory", "update"]
+                }
+              }
+            },
+            {
+              "name": "Get Low Stock Products",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{adminToken}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/products/inventory/low-stock",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["products", "inventory", "low-stock"]
+                }
+              }
+            },
+            {
+              "name": "Get Product Statistics",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{adminToken}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/products/stats/overview",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["products", "stats", "overview"]
+                }
+              }
+            }
+          ]
+        },
+        {
+          "name": "Bulk Operations",
+          "item": [
+            {
+              "name": "Bulk Create Products",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{adminToken}}"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"products\": [\n    {\n      \"name\": \"Laptop Pro\",\n      \"price\": 1299.99,\n      \"quantity\": 50,\n      \"status\": \"active\",\n      \"category_id\": \"{{testCategoryId}}\"\n    },\n    {\n      \"name\": \"Wireless Headphones\",\n      \"price\": 199.99,\n      \"quantity\": 100,\n      \"status\": \"active\",\n      \"category_id\": \"{{testCategoryId}}\"\n    }\n  ]\n}"
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/products/bulk/create",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["products", "bulk", "create"]
+                }
+              }
+            },
+            {
+              "name": "Download Product Template",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/products/templates/products",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["products", "templates", "products"]
+                }
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "🛒 Customer Shopping (Public)",
+      "item": [
+        {
+          "name": "Browse Products (No Auth Required)",
+          "item": [
+            {
+              "name": "Browse All Products",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/products?page=1&limit=20&sort_by=created_at&sort_order=desc",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["products"],
+                  "query": [
+                    { "key": "page", "value": "1" },
+                    { "key": "limit", "value": "20" },
+                    { "key": "sort_by", "value": "created_at" },
+                    { "key": "sort_order", "value": "desc" }
+                  ]
+                }
+              }
+            },
+            {
+              "name": "Search Products",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/products?search=smartphone&page=1&limit=10",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["products"],
+                  "query": [
+                    { "key": "search", "value": "smartphone" },
+                    { "key": "page", "value": "1" },
+                    { "key": "limit", "value": "10" }
+                  ]
+                }
+              }
+            },
+            {
+              "name": "Get Featured Products",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/products?is_featured=true&limit=10",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["products"],
+                  "query": [
+                    { "key": "is_featured", "value": "true" },
+                    { "key": "limit", "value": "10" }
+                  ]
+                }
+              }
+            },
+            {
+              "name": "Filter by Category and Price",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/products?category_id={{testCategoryId}}&min_price=100&max_price=1000&in_stock=true",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["products"],
+                  "query": [
+                    { "key": "category_id", "value": "{{testCategoryId}}" },
+                    { "key": "min_price", "value": "100" },
+                    { "key": "max_price", "value": "1000" },
+                    { "key": "in_stock", "value": "true" }
+                  ]
+                }
+              }
+            },
+            {
+              "name": "Get Product Details (Public)",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/products/{{testProductId}}",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["products", "{{testProductId}}"]
+                }
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "🧪 Testing & Error Scenarios",
+      "item": [
+        {
+          "name": "Authentication Errors",
+          "item": [
+            {
+              "name": "Invalid Magic Link",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"token\": \"invalid-token-12345\"\n}"
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/auth/verify-magic-link",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["auth", "verify-magic-link"]
+                }
+              }
+            },
+            {
+              "name": "Unauthorized Access (No Token)",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/onboard/stats",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["onboard", "stats"]
+                }
+              }
+            },
+            {
+              "name": "Wrong Role Access",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{customerToken}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/products/categories",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["products", "categories"]
+                }
+              }
+            }
+          ]
+        },
+        {
+          "name": "Validation Errors",
+          "item": [
+            {
+              "name": "Invalid UUID Format",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{superAdminToken}}"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"userId\": \"invalid-uuid-format\",\n  \"action\": \"approve\"\n}"
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/onboard/process",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["onboard", "process"]
+                }
+              }
+            },
+            {
+              "name": "Missing Required Fields",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{adminToken}}"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"description\": \"Product without name or price\"\n}"
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/products",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["products"]
+                }
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "📚 System Information",
+      "item": [
+        {
+          "name": "System Health Check",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/../../health",
+              "host": ["{{baseUrl}}"],
+              "path": ["..", "..", "health"]
+            }
+          }
+        },
+        {
+          "name": "API Information",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}",
+              "host": ["{{baseUrl}}"]
+            }
+          }
+        }
+      ]
+    }
+  ],
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "console.log('=== Collection Variables ===');",
+          "console.log('Base URL:', pm.collectionVariables.get('baseUrl'));",
+          "console.log('Super Admin Token:', pm.collectionVariables.get('superAdminToken') ? 'SET' : 'NOT SET');",
+          "console.log('Admin Token:', pm.collectionVariables.get('adminToken') ? 'SET' : 'NOT SET');",
+          "console.log('Customer Token:', pm.collectionVariables.get('customerToken') ? 'SET' : 'NOT SET');",
+          "console.log('=============================');"
+        ]
+      }
+    },
+    {
+      "listen": "test",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "if (pm.response) {",
+          "    console.log('Response Status:', pm.response.status);",
+          "    if (pm.response.code >= 400) {",
+          "        console.log('❌ Request failed');",
+          "        try {",
+          "            const responseJson = pm.response.json();",
+          "            if (responseJson.error) console.log('Error:', responseJson.error);",
+          "        } catch (e) {}",
+          "    } else {",
+          "        console.log('✅ Request successful');",
+          "    }",
+          "}",
+          "",
+          "pm.test('Response time is reasonable', function () {",
+          "    pm.expect(pm.response.responseTime).to.be.below(5000);",
+          "});"
+        ]
+      }
+    }
+  ]
+}
