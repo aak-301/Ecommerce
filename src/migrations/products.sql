@@ -7,7 +7,7 @@
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 
 -- =============================================
--- PRODUCT MANAGEMENT TABLES (EXISTING)
+-- PRODUCT MANAGEMENT TABLES
 -- =============================================
 
 -- Create categories table for product organization
@@ -144,7 +144,7 @@ CREATE TABLE IF NOT EXISTS deleted_accounts_metadata (
 );
 
 -- =============================================
--- CUSTOMER SHOPPING TABLES (NEW)
+-- CUSTOMER SHOPPING TABLES
 -- =============================================
 
 -- Create customer addresses table
@@ -240,7 +240,7 @@ CREATE TABLE IF NOT EXISTS order_items (
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
--- Create product reviews table (optional feature)
+-- Create product reviews table
 CREATE TABLE IF NOT EXISTS product_reviews (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     product_id UUID NOT NULL REFERENCES products(id) ON DELETE CASCADE,
@@ -259,7 +259,7 @@ CREATE TABLE IF NOT EXISTS product_reviews (
     UNIQUE(product_id, customer_id, order_id)
 );
 
--- Create wishlist table (optional feature)
+-- Create wishlist table
 CREATE TABLE IF NOT EXISTS wishlists (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     customer_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -272,7 +272,7 @@ CREATE TABLE IF NOT EXISTS wishlists (
 -- INDEXES FOR PERFORMANCE
 -- =============================================
 
--- Existing indexes...
+-- Product indexes
 CREATE INDEX IF NOT EXISTS idx_products_sku ON products(sku);
 CREATE INDEX IF NOT EXISTS idx_products_slug ON products(slug);
 CREATE INDEX IF NOT EXISTS idx_products_status ON products(status);
@@ -316,7 +316,7 @@ CREATE INDEX IF NOT EXISTS idx_bulk_import_history_created_at ON bulk_import_his
 CREATE INDEX IF NOT EXISTS idx_deleted_accounts_metadata_user_id ON deleted_accounts_metadata(original_user_id);
 CREATE INDEX IF NOT EXISTS idx_deleted_accounts_metadata_type ON deleted_accounts_metadata(metadata_type);
 
--- Customer shopping indexes (NEW)
+-- Customer shopping indexes
 CREATE INDEX IF NOT EXISTS idx_customer_addresses_customer_id ON customer_addresses(customer_id);
 CREATE INDEX IF NOT EXISTS idx_customer_addresses_type ON customer_addresses(type);
 CREATE INDEX IF NOT EXISTS idx_customer_addresses_default ON customer_addresses(is_default);
@@ -346,7 +346,7 @@ CREATE INDEX IF NOT EXISTS idx_products_search ON products USING gin(to_tsvector
 CREATE INDEX IF NOT EXISTS idx_categories_search ON categories USING gin(to_tsvector('english', name || ' ' || COALESCE(description, '')));
 
 -- =============================================
--- TRIGGERS FOR AUTOMATIC UPDATES
+-- CORE FUNCTIONS
 -- =============================================
 
 -- Trigger to automatically update updated_at for products
@@ -356,45 +356,90 @@ BEGIN
     NEW.updated_at = CURRENT_TIMESTAMP;
     RETURN NEW;
 END;
-$$ LANGUAGE 'plpgsql';
+$$ LANGUAGE plpgsql;
+
+-- Function to update product status based on inventory
+CREATE OR REPLACE FUNCTION update_product_status()
+RETURNS TRIGGER AS $$
+BEGIN
+    -- Auto-update status based on quantity
+    IF NEW.track_quantity = TRUE THEN
+        IF NEW.quantity = 0 AND NEW.allow_backorder = FALSE THEN
+            NEW.status = 'out_of_stock';
+        ELSIF NEW.quantity > 0 AND OLD.status = 'out_of_stock' THEN
+            NEW.status = 'active';
+        END IF;
+    END IF;
+    
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+-- Function to log inventory changes
+CREATE OR REPLACE FUNCTION log_inventory_change()
+RETURNS TRIGGER AS $$
+BEGIN
+    -- Log when inventory is updated
+    IF TG_OP = 'INSERT' THEN
+        INSERT INTO inventory_history (
+            product_id, change_type, quantity_change, 
+            quantity_before, quantity_after, reason, performed_by
+        ) VALUES (
+            NEW.product_id, 'stock_in', NEW.quantity,
+            0, NEW.quantity, 'Initial inventory', NEW.created_by
+        );
+    END IF;
+    
+    RETURN COALESCE(NEW, OLD);
+END;
+$$ LANGUAGE plpgsql;
+
+-- =============================================
+-- CREATE TRIGGERS
+-- =============================================
 
 CREATE TRIGGER update_products_updated_at
     BEFORE UPDATE ON products
     FOR EACH ROW
     EXECUTE FUNCTION update_product_updated_at();
 
--- Trigger to automatically update updated_at for categories
 CREATE TRIGGER update_categories_updated_at
     BEFORE UPDATE ON categories
     FOR EACH ROW
     EXECUTE FUNCTION update_updated_at_column();
 
--- Trigger to automatically update updated_at for product variants
 CREATE TRIGGER update_product_variants_updated_at
     BEFORE UPDATE ON product_variants
     FOR EACH ROW
     EXECUTE FUNCTION update_product_updated_at();
 
--- Trigger to automatically update updated_at for shopping cart
 CREATE TRIGGER update_shopping_cart_updated_at
     BEFORE UPDATE ON shopping_cart
     FOR EACH ROW
     EXECUTE FUNCTION update_product_updated_at();
 
--- Trigger to automatically update updated_at for customer addresses
 CREATE TRIGGER update_customer_addresses_updated_at
     BEFORE UPDATE ON customer_addresses
     FOR EACH ROW
     EXECUTE FUNCTION update_product_updated_at();
 
--- Trigger to automatically update updated_at for orders
 CREATE TRIGGER update_orders_updated_at
     BEFORE UPDATE ON orders
     FOR EACH ROW
     EXECUTE FUNCTION update_product_updated_at();
 
+CREATE TRIGGER product_status_change
+    BEFORE UPDATE ON products
+    FOR EACH ROW
+    EXECUTE FUNCTION update_product_status();
+
+CREATE TRIGGER inventory_change_notification
+    AFTER INSERT ON inventory_history
+    FOR EACH ROW
+    EXECUTE FUNCTION log_inventory_change();
+
 -- =============================================
--- CUSTOMER SHOPPING FUNCTIONS (NEW)
+-- CUSTOMER SHOPPING FUNCTIONS
 -- =============================================
 
 -- Function to generate unique order number
@@ -476,235 +521,37 @@ EXCEPTION
 END;
 $$ LANGUAGE plpgsql;
 
--- Function to update inventory on order placement
-CREATE OR REPLACE FUNCTION update_inventory_on_order(order_id_param UUID)
-RETURNS BOOLEAN AS $$
-DECLARE
-    item_record RECORD;
-    success BOOLEAN := TRUE;
-BEGIN
-    FOR item_record IN
-        SELECT oi.product_id, oi.variant_id, oi.quantity
-        FROM order_items oi
-        WHERE oi.order_id = order_id_param
-    LOOP
-        -- Update inventory using existing function
-        IF NOT update_product_quantity(
-            item_record.product_id,
-            item_record.variant_id,
-            -item_record.quantity, -- Negative to reduce stock
-            'sale',
-            'Order placement',
-            order_id_param,
-            NULL -- System operation
-        ) THEN
-            success := FALSE;
-            EXIT;
-        END IF;
-    END LOOP;
-    
-    RETURN success;
-END;
-$$ LANGUAGE plpgsql;
-
--- Function to cancel order and restore inventory
-CREATE OR REPLACE FUNCTION cancel_order(
-    order_id_param UUID,
-    cancelled_by_param UUID,
-    reason_param TEXT DEFAULT 'Customer cancellation'
-)
-RETURNS BOOLEAN AS $$
-DECLARE
-    item_record RECORD;
-    order_status VARCHAR(50);
-BEGIN
-    -- Check current order status
-    SELECT status INTO order_status
-    FROM orders
-    WHERE id = order_id_param;
-    
-    IF order_status NOT IN ('pending', 'confirmed') THEN
-        RETURN FALSE; -- Cannot cancel shipped/delivered orders
-    END IF;
-    
-    -- Update order status
-    UPDATE orders
-    SET status = 'cancelled',
-        cancelled_at = NOW(),
-        cancelled_by = cancelled_by_param,
-        cancellation_reason = reason_param,
-        updated_at = NOW()
-    WHERE id = order_id_param;
-    
-    -- Restore inventory
-    FOR item_record IN
-        SELECT oi.product_id, oi.variant_id, oi.quantity
-        FROM order_items oi
-        WHERE oi.order_id = order_id_param
-    LOOP
-        PERFORM update_product_quantity(
-            item_record.product_id,
-            item_record.variant_id,
-            item_record.quantity, -- Positive to restore stock
-            'return',
-            'Order cancellation',
-            order_id_param,
-            cancelled_by_param
-        );
-    END LOOP;
-    
-    RETURN TRUE;
-END;
-$$ LANGUAGE plpgsql;
-
--- Function to get customer order statistics
-CREATE OR REPLACE FUNCTION get_customer_order_stats(customer_id_param UUID)
+-- Function to get product by slug
+CREATE OR REPLACE FUNCTION get_product_by_slug(slug_param VARCHAR(255))
 RETURNS TABLE (
-    total_orders INTEGER,
-    total_spent DECIMAL(12,2),
-    pending_orders INTEGER,
-    completed_orders INTEGER,
-    cancelled_orders INTEGER,
-    average_order_value DECIMAL(12,2)
+    id UUID,
+    name VARCHAR(255),
+    description TEXT,
+    price DECIMAL(10,2),
+    sale_price DECIMAL(10,2),
+    quantity INTEGER,
+    status VARCHAR(50),
+    featured_image TEXT,
+    gallery_images TEXT[],
+    category_name VARCHAR(255),
+    average_rating DECIMAL(3,2),
+    review_count INTEGER
 ) AS $$
 BEGIN
     RETURN QUERY
     SELECT 
-        COUNT(*)::INTEGER as total_orders,
-        COALESCE(SUM(total_amount), 0)::DECIMAL(12,2) as total_spent,
-        COUNT(CASE WHEN status IN ('pending', 'confirmed', 'processing') THEN 1 END)::INTEGER as pending_orders,
-        COUNT(CASE WHEN status = 'delivered' THEN 1 END)::INTEGER as completed_orders,
-        COUNT(CASE WHEN status = 'cancelled' THEN 1 END)::INTEGER as cancelled_orders,
-        COALESCE(AVG(total_amount), 0)::DECIMAL(12,2) as average_order_value
-    FROM orders 
-    WHERE customer_id = customer_id_param;
-END;
-$$ LANGUAGE plpgsql;
-
--- =============================================
--- EXISTING FUNCTIONS (KEEP AS IS)
--- =============================================
-
--- Function to update product quantity and log inventory change
-CREATE OR REPLACE FUNCTION update_product_quantity(
-    product_id_param UUID,
-    variant_id_param UUID DEFAULT NULL,
-    quantity_change_param INTEGER,
-    change_type_param VARCHAR(50),
-    reason_param TEXT DEFAULT NULL,
-    reference_id_param UUID DEFAULT NULL,
-    performed_by_param UUID
-)
-RETURNS BOOLEAN AS $$
-DECLARE
-    current_quantity INTEGER;
-    new_quantity INTEGER;
-    update_successful BOOLEAN := FALSE;
-BEGIN
-    -- Update product or variant quantity
-    IF variant_id_param IS NOT NULL THEN
-        -- Update variant quantity
-        SELECT quantity INTO current_quantity FROM product_variants WHERE id = variant_id_param;
-        
-        IF current_quantity IS NULL THEN
-            RETURN FALSE;
-        END IF;
-        
-        new_quantity := current_quantity + quantity_change_param;
-        
-        IF new_quantity >= 0 THEN
-            UPDATE product_variants SET quantity = new_quantity WHERE id = variant_id_param;
-            GET DIAGNOSTICS update_successful = FOUND;
-        END IF;
-    ELSE
-        -- Update product quantity
-        SELECT quantity INTO current_quantity FROM products WHERE id = product_id_param AND deleted_at IS NULL;
-        
-        IF current_quantity IS NULL THEN
-            RETURN FALSE;
-        END IF;
-        
-        new_quantity := current_quantity + quantity_change_param;
-        
-        IF new_quantity >= 0 THEN
-            UPDATE products SET quantity = new_quantity WHERE id = product_id_param AND deleted_at IS NULL;
-            GET DIAGNOSTICS update_successful = FOUND;
-        END IF;
-    END IF;
-    
-    -- Log the inventory change
-    IF update_successful THEN
-        INSERT INTO inventory_history (
-            product_id, variant_id, change_type, quantity_change,
-            quantity_before, quantity_after, reason, reference_id, performed_by
-        ) VALUES (
-            product_id_param, variant_id_param, change_type_param, quantity_change_param,
-            current_quantity, new_quantity, reason_param, reference_id_param, performed_by_param
-        );
-    END IF;
-    
-    RETURN update_successful;
-END;
-$$ LANGUAGE plpgsql;
-
--- Function to soft delete product
-CREATE OR REPLACE FUNCTION soft_delete_product(
-    product_id_param UUID,
-    deleted_by_param UUID
-)
-RETURNS BOOLEAN AS $$
-DECLARE
-    deletion_successful BOOLEAN := FALSE;
-BEGIN
-    UPDATE products 
-    SET 
-        deleted_at = NOW(),
-        deleted_by = deleted_by_param,
-        updated_at = NOW()
-    WHERE id = product_id_param AND deleted_at IS NULL;
-    
-    GET DIAGNOSTICS deletion_successful = FOUND;
-    RETURN deletion_successful;
-END;
-$$ LANGUAGE plpgsql;
-
--- Function to restore soft deleted product
-CREATE OR REPLACE FUNCTION restore_product(product_id_param UUID)
-RETURNS BOOLEAN AS $$
-DECLARE
-    restoration_successful BOOLEAN := FALSE;
-BEGIN
-    UPDATE products 
-    SET 
-        deleted_at = NULL,
-        deleted_by = NULL,
-        updated_at = NOW()
-    WHERE id = product_id_param AND deleted_at IS NOT NULL;
-    
-    GET DIAGNOSTICS restoration_successful = FOUND;
-    RETURN restoration_successful;
-END;
-$$ LANGUAGE plpgsql;
-
--- Function to get low stock products
-CREATE OR REPLACE FUNCTION get_low_stock_products(user_id_param UUID DEFAULT NULL)
-RETURNS TABLE (
-    product_id UUID,
-    product_name VARCHAR(255),
-    sku VARCHAR(100),
-    current_quantity INTEGER,
-    min_quantity INTEGER,
-    status VARCHAR(50)
-) AS $$
-BEGIN
-    RETURN QUERY
-    SELECT 
-        p.id as product_id,
-        p.name as product_name,
-        p.sku,
-        p.quantity as current_quantity,
-        p.min_quantity,
-        p.status
+        p.id,
+        p.name,
+        p.description,
+        p.price,
+        p.sale_price,
+        p.quantity,
+        p.status,
+        p.featured_image,
+        p.gallery_images,
+        c.name as category_name,
+        COALESCE(AVG(pr.rating), 0)::DECIMAL(3,2) as average_rating,
+        COUNT(pr.id)::INTEGER as review_count
     FROM products p
     WHERE p.deleted_at IS NULL
     AND p.track_quantity = TRUE
@@ -761,9 +608,9 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
--- Function to clean up deleted user's products (called by user deletion)
+-- Function to clean up deleted user's products
 CREATE OR REPLACE FUNCTION cleanup_user_products(user_id_param UUID)
-RETURNS INTEGER AS $
+RETURNS INTEGER AS $$
 DECLARE
     deleted_count INTEGER := 0;
 BEGIN
@@ -794,10 +641,31 @@ BEGIN
     
     RETURN deleted_count;
 END;
-$ LANGUAGE plpgsql;
+$$ LANGUAGE plpgsql;
+
+-- Function to bulk update product prices
+CREATE OR REPLACE FUNCTION bulk_update_product_prices(
+    product_ids UUID[],
+    new_price DECIMAL(10,2)
+)
+RETURNS INTEGER AS $$
+DECLARE
+    updated_count INTEGER := 0;
+BEGIN
+    UPDATE products 
+    SET 
+        price = new_price,
+        updated_at = NOW()
+    WHERE id = ANY(product_ids)
+    AND deleted_at IS NULL;
+    
+    GET DIAGNOSTICS updated_count = ROW_COUNT;
+    RETURN updated_count;
+END;
+$$ LANGUAGE plpgsql;
 
 -- =============================================
--- CUSTOMER VIEWS FOR REPORTING (NEW)
+-- VIEWS FOR REPORTING
 -- =============================================
 
 -- View for customer order summary
@@ -838,7 +706,7 @@ LEFT JOIN product_reviews pr ON p.id = pr.product_id AND pr.is_approved = TRUE
 WHERE p.deleted_at IS NULL
 GROUP BY p.id, c.name, c.slug;
 
--- View for active products with category info (updated from existing)
+-- View for active products with category info
 CREATE OR REPLACE VIEW active_products_view AS
 SELECT 
     p.id,
@@ -873,7 +741,7 @@ LEFT JOIN product_reviews pr ON p.id = pr.product_id AND pr.is_approved = TRUE
 WHERE p.deleted_at IS NULL
 GROUP BY p.id, c.name, c.slug, u.name;
 
--- View for inventory status (keep existing)
+-- View for inventory status
 CREATE OR REPLACE VIEW inventory_status_view AS
 SELECT 
     p.id as product_id,
@@ -895,8 +763,76 @@ LEFT JOIN users u ON p.created_by = u.id
 WHERE p.deleted_at IS NULL
 AND p.track_quantity = TRUE;
 
+-- View for low stock alerts
+CREATE OR REPLACE VIEW low_stock_alert AS
+SELECT 
+    p.id,
+    p.name,
+    p.sku,
+    p.quantity,
+    p.min_quantity,
+    p.status,
+    c.name as category_name,
+    u.name as created_by_name,
+    u.email as owner_email
+FROM products p
+LEFT JOIN categories c ON p.category_id = c.id
+LEFT JOIN users u ON p.created_by = u.id
+WHERE p.deleted_at IS NULL
+AND p.track_quantity = TRUE
+AND p.quantity <= p.min_quantity
+ORDER BY p.quantity ASC;
+
+-- View for product performance
+CREATE OR REPLACE VIEW product_performance AS
+SELECT 
+    p.id,
+    p.name,
+    p.sku,
+    p.price,
+    p.quantity,
+    COALESCE(sales.total_sold, 0) as total_sold,
+    COALESCE(sales.total_revenue, 0) as total_revenue,
+    COALESCE(AVG(pr.rating), 0) as average_rating,
+    COUNT(pr.id) as review_count,
+    p.created_at
+FROM products p
+LEFT JOIN (
+    SELECT 
+        oi.product_id,
+        SUM(oi.quantity) as total_sold,
+        SUM(oi.total_price) as total_revenue
+    FROM order_items oi
+    JOIN orders o ON oi.order_id = o.id
+    WHERE o.status IN ('delivered', 'shipped')
+    GROUP BY oi.product_id
+) sales ON p.id = sales.product_id
+LEFT JOIN product_reviews pr ON p.id = pr.product_id AND pr.is_approved = TRUE
+WHERE p.deleted_at IS NULL
+GROUP BY p.id, sales.total_sold, sales.total_revenue
+ORDER BY sales.total_revenue DESC NULLS LAST;
+
+-- View for customer shopping summary
+CREATE OR REPLACE VIEW customer_shopping_summary AS
+SELECT 
+    u.id as customer_id,
+    u.name,
+    u.email,
+    COUNT(DISTINCT o.id) as total_orders,
+    COALESCE(SUM(o.total_amount), 0) as total_spent,
+    COALESCE(AVG(o.total_amount), 0) as average_order_value,
+    MAX(o.created_at) as last_order_date,
+    COUNT(DISTINCT sc.product_id) as cart_items,
+    COUNT(DISTINCT w.product_id) as wishlist_items
+FROM users u
+LEFT JOIN orders o ON u.id = o.customer_id AND o.status != 'cancelled'
+LEFT JOIN shopping_cart sc ON u.id = sc.customer_id
+LEFT JOIN wishlists w ON u.id = w.customer_id
+WHERE u.role = 'customer' AND u.deleted_at IS NULL
+GROUP BY u.id, u.name, u.email;
+
 -- =============================================
--- SAMPLE DATA (OPTIONAL)
+-- SAMPLE DATA
 -- =============================================
 
 -- Insert sample categories (only if they don't exist)
@@ -929,61 +865,375 @@ AND NOT EXISTS (SELECT 1 FROM categories WHERE slug = 'home-garden')
 LIMIT 1;
 
 -- =============================================
--- VERIFICATION
+-- VERIFICATION QUERIES
 -- =============================================
 
--- Verify all product tables exist
+-- Display all created functions, triggers, and views
 DO $
-DECLARE
-    table_count INTEGER;
 BEGIN
-    SELECT COUNT(*) INTO table_count 
-    FROM information_schema.tables 
-    WHERE table_schema = 'public' 
-    AND table_name IN (
-        'products', 'categories', 'product_variants', 'product_attributes', 
-        'inventory_history', 'bulk_import_history', 'deleted_accounts_metadata',
-        'customer_addresses', 'shopping_cart', 'orders', 'order_items',
-        'product_reviews', 'wishlists'
-    );
-    
-    IF table_count = 13 THEN
-        RAISE NOTICE 'SUCCESS: All product management tables created (%)!', table_count;
-    ELSE
-        RAISE WARNING 'WARNING: Missing product tables! Expected 13, found %', table_count;
-    END IF;
-END $;
+    RAISE NOTICE '=== CREATED FUNCTIONS ===';
+    RAISE NOTICE 'Functions created in this migration:';
+    RAISE NOTICE '1. update_product_updated_at()';
+    RAISE NOTICE '2. update_product_status()';
+    RAISE NOTICE '3. log_inventory_change()';
+    RAISE NOTICE '4. generate_order_number()';
+    RAISE NOTICE '5. calculate_cart_total(UUID)';
+    RAISE NOTICE '6. add_to_cart(UUID, UUID, UUID, INTEGER, DECIMAL)';
+    RAISE NOTICE '7. get_product_by_slug(VARCHAR)';
+    RAISE NOTICE '8. search_products(TEXT, UUID, INTEGER, INTEGER)';
+    RAISE NOTICE '9. get_category_products(UUID, INTEGER, INTEGER)';
+    RAISE NOTICE '10. update_inventory_on_order(UUID)';
+    RAISE NOTICE '11. cancel_order(UUID, UUID, TEXT)';
+    RAISE NOTICE '12. get_customer_order_stats(UUID)';
+    RAISE NOTICE '13. update_product_quantity(UUID, UUID, INTEGER, VARCHAR, TEXT, UUID, UUID)';
+    RAISE NOTICE '14. soft_delete_product(UUID, UUID)';
+    RAISE NOTICE '15. restore_product(UUID)';
+    RAISE NOTICE '16. get_low_stock_products(UUID)';
+    RAISE NOTICE '17. get_product_stats(UUID)';
+    RAISE NOTICE '18. generate_unique_sku(VARCHAR)';
+    RAISE NOTICE '19. cleanup_user_products(UUID)';
+    RAISE NOTICE '20. bulk_update_product_prices(UUID[], DECIMAL)';
+    RAISE NOTICE '';
+    RAISE NOTICE '=== CREATED TRIGGERS ===';
+    RAISE NOTICE 'Triggers created:';
+    RAISE NOTICE '1. update_products_updated_at ON products';
+    RAISE NOTICE '2. update_categories_updated_at ON categories';
+    RAISE NOTICE '3. update_product_variants_updated_at ON product_variants';
+    RAISE NOTICE '4. update_shopping_cart_updated_at ON shopping_cart';
+    RAISE NOTICE '5. update_customer_addresses_updated_at ON customer_addresses';
+    RAISE NOTICE '6. update_orders_updated_at ON orders';
+    RAISE NOTICE '7. product_status_change ON products';
+    RAISE NOTICE '8. inventory_change_notification ON inventory_history';
+    RAISE NOTICE '';
+    RAISE NOTICE '=== CREATED VIEWS ===';
+    RAISE NOTICE 'Views created:';
+    RAISE NOTICE '1. customer_order_summary';
+    RAISE NOTICE '2. products_with_reviews';
+    RAISE NOTICE '3. active_products_view';
+    RAISE NOTICE '4. inventory_status_view';
+    RAISE NOTICE '5. low_stock_alert';
+    RAISE NOTICE '6. product_performance';
+    RAISE NOTICE '7. customer_shopping_summary';
+    RAISE NOTICE '';
+    RAISE NOTICE '🛍️ Complete Product & Customer Management System Migration Completed Successfully!';
+END $; p
+    LEFT JOIN categories c ON p.category_id = c.id
+    LEFT JOIN product_reviews pr ON p.id = pr.product_id AND pr.is_approved = TRUE
+    WHERE p.slug = slug_param 
+    AND p.deleted_at IS NULL 
+    AND p.status = 'active'
+    GROUP BY p.id, c.name;
+END;
+$ LANGUAGE plpgsql;
 
--- Verify all functions exist
-DO $
-DECLARE
-    function_count INTEGER;
+-- Function to search products
+CREATE OR REPLACE FUNCTION search_products(
+    search_term TEXT DEFAULT NULL,
+    category_id_param UUID DEFAULT NULL,
+    limit_param INTEGER DEFAULT 20,
+    offset_param INTEGER DEFAULT 0
+)
+RETURNS TABLE (
+    id UUID,
+    name VARCHAR(255),
+    slug VARCHAR(255),
+    price DECIMAL(10,2),
+    sale_price DECIMAL(10,2),
+    featured_image TEXT,
+    category_name VARCHAR(255),
+    average_rating DECIMAL(3,2),
+    review_count INTEGER
+) AS $
 BEGIN
-    SELECT COUNT(*) INTO function_count 
-    FROM information_schema.routines 
-    WHERE routine_schema = 'public' 
-    AND routine_name IN (
-        'update_product_quantity',
-        'soft_delete_product',
-        'restore_product',
-        'get_low_stock_products',
-        'get_product_stats',
-        'generate_unique_sku',
-        'cleanup_user_products',
-        'generate_order_number',
-        'calculate_cart_total',
-        'add_to_cart',
-        'update_inventory_on_order',
-        'cancel_order',
-        'get_customer_order_stats'
-    );
-    
-    IF function_count >= 13 THEN
-        RAISE NOTICE 'SUCCESS: All product functions created (%)!', function_count;
-    ELSE
-        RAISE WARNING 'WARNING: Missing product functions! Expected 13+, found %', function_count;
-    END IF;
-END $;
+    RETURN QUERY
+    SELECT 
+        p.id,
+        p.name,
+        p.slug,
+        p.price,
+        p.sale_price,
+        p.featured_image,
+        c.name as category_name,
+        COALESCE(AVG(pr.rating), 0)::DECIMAL(3,2) as average_rating,
+        COUNT(pr.id)::INTEGER as review_count
+    FROM products p
+    LEFT JOIN categories c ON p.category_id = c.id
+    LEFT JOIN product_reviews pr ON p.id = pr.product_id AND pr.is_approved = TRUE
+    WHERE p.deleted_at IS NULL 
+    AND p.status = 'active'
+    AND (search_term IS NULL OR p.name ILIKE '%' || search_term || '%' OR p.description ILIKE '%' || search_term || '%')
+    AND (category_id_param IS NULL OR p.category_id = category_id_param)
+    GROUP BY p.id, c.name
+    ORDER BY p.created_at DESC
+    LIMIT limit_param OFFSET offset_param;
+END;
+$ LANGUAGE plpgsql;
 
--- Final success message
-RAISE NOTICE '🛍️ Complete Product & Customer Management System Migration Completed!';
+-- Function to get category products
+CREATE OR REPLACE FUNCTION get_category_products(
+    category_id_param UUID,
+    limit_param INTEGER DEFAULT 20,
+    offset_param INTEGER DEFAULT 0
+)
+RETURNS TABLE (
+    id UUID,
+    name VARCHAR(255),
+    slug VARCHAR(255),
+    price DECIMAL(10,2),
+    sale_price DECIMAL(10,2),
+    featured_image TEXT,
+    average_rating DECIMAL(3,2),
+    review_count INTEGER
+) AS $
+BEGIN
+    RETURN QUERY
+    SELECT 
+        p.id,
+        p.name,
+        p.slug,
+        p.price,
+        p.sale_price,
+        p.featured_image,
+        COALESCE(AVG(pr.rating), 0)::DECIMAL(3,2) as average_rating,
+        COUNT(pr.id)::INTEGER as review_count
+    FROM products p
+    LEFT JOIN product_reviews pr ON p.id = pr.product_id AND pr.is_approved = TRUE
+    WHERE p.category_id = category_id_param
+    AND p.deleted_at IS NULL 
+    AND p.status = 'active'
+    GROUP BY p.id
+    ORDER BY p.created_at DESC
+    LIMIT limit_param OFFSET offset_param;
+END;
+$ LANGUAGE plpgsql;
+
+-- Function to update inventory on order placement
+CREATE OR REPLACE FUNCTION update_inventory_on_order(order_id_param UUID)
+RETURNS BOOLEAN AS $
+DECLARE
+    item_record RECORD;
+    success BOOLEAN := TRUE;
+BEGIN
+    FOR item_record IN
+        SELECT oi.product_id, oi.variant_id, oi.quantity
+        FROM order_items oi
+        WHERE oi.order_id = order_id_param
+    LOOP
+        -- Update inventory using existing function
+        IF NOT update_product_quantity(
+            item_record.product_id,
+            item_record.variant_id,
+            -item_record.quantity, -- Negative to reduce stock
+            'sale',
+            'Order placement',
+            NULL, -- performed_by_param
+            order_id_param
+        ) THEN
+            success := FALSE;
+            EXIT;
+        END IF;
+    END LOOP;
+    
+    RETURN success;
+END;
+$ LANGUAGE plpgsql;
+
+-- Function to cancel order and restore inventory
+CREATE OR REPLACE FUNCTION cancel_order(
+    order_id_param UUID,
+    cancelled_by_param UUID,
+    reason_param TEXT DEFAULT 'Customer cancellation'
+)
+RETURNS BOOLEAN AS $
+DECLARE
+    item_record RECORD;
+    order_status VARCHAR(50);
+BEGIN
+    -- Check current order status
+    SELECT status INTO order_status
+    FROM orders
+    WHERE id = order_id_param;
+    
+    IF order_status NOT IN ('pending', 'confirmed') THEN
+        RETURN FALSE; -- Cannot cancel shipped/delivered orders
+    END IF;
+    
+    -- Update order status
+    UPDATE orders
+    SET status = 'cancelled',
+        cancelled_at = NOW(),
+        cancelled_by = cancelled_by_param,
+        cancellation_reason = reason_param,
+        updated_at = NOW()
+    WHERE id = order_id_param;
+    
+    -- Restore inventory
+    FOR item_record IN
+        SELECT oi.product_id, oi.variant_id, oi.quantity
+        FROM order_items oi
+        WHERE oi.order_id = order_id_param
+    LOOP
+        PERFORM update_product_quantity(
+            item_record.product_id,
+            item_record.variant_id,
+            item_record.quantity, -- Positive to restore stock
+            'return',
+            'Order cancellation',
+            cancelled_by_param,
+            order_id_param
+        );
+    END LOOP;
+    
+    RETURN TRUE;
+END;
+$ LANGUAGE plpgsql;
+
+-- Function to get customer order statistics
+CREATE OR REPLACE FUNCTION get_customer_order_stats(customer_id_param UUID)
+RETURNS TABLE (
+    total_orders INTEGER,
+    total_spent DECIMAL(12,2),
+    pending_orders INTEGER,
+    completed_orders INTEGER,
+    cancelled_orders INTEGER,
+    average_order_value DECIMAL(12,2)
+) AS $
+BEGIN
+    RETURN QUERY
+    SELECT 
+        COUNT(*)::INTEGER as total_orders,
+        COALESCE(SUM(total_amount), 0)::DECIMAL(12,2) as total_spent,
+        COUNT(CASE WHEN status IN ('pending', 'confirmed', 'processing') THEN 1 END)::INTEGER as pending_orders,
+        COUNT(CASE WHEN status = 'delivered' THEN 1 END)::INTEGER as completed_orders,
+        COUNT(CASE WHEN status = 'cancelled' THEN 1 END)::INTEGER as cancelled_orders,
+        COALESCE(AVG(total_amount), 0)::DECIMAL(12,2) as average_order_value
+    FROM orders 
+    WHERE customer_id = customer_id_param;
+END;
+$ LANGUAGE plpgsql;
+
+-- =============================================
+-- PRODUCT MANAGEMENT FUNCTIONS
+-- =============================================
+
+-- Function to update product quantity and log inventory change
+CREATE OR REPLACE FUNCTION update_product_quantity(
+    product_id_param UUID,
+    variant_id_param UUID DEFAULT NULL,
+    quantity_change_param INTEGER,
+    change_type_param VARCHAR(50),
+    reason_param TEXT DEFAULT NULL,
+    performed_by_param UUID,
+    reference_id_param UUID DEFAULT NULL
+)
+RETURNS BOOLEAN AS $
+DECLARE
+    current_quantity INTEGER;
+    new_quantity INTEGER;
+    update_successful BOOLEAN := FALSE;
+BEGIN
+    -- Update product or variant quantity
+    IF variant_id_param IS NOT NULL THEN
+        -- Update variant quantity
+        SELECT quantity INTO current_quantity FROM product_variants WHERE id = variant_id_param;
+        
+        IF current_quantity IS NULL THEN
+            RETURN FALSE;
+        END IF;
+        
+        new_quantity := current_quantity + quantity_change_param;
+        
+        IF new_quantity >= 0 THEN
+            UPDATE product_variants SET quantity = new_quantity WHERE id = variant_id_param;
+            GET DIAGNOSTICS update_successful = ROW_COUNT;
+        END IF;
+    ELSE
+        -- Update product quantity
+        SELECT quantity INTO current_quantity FROM products WHERE id = product_id_param AND deleted_at IS NULL;
+        
+        IF current_quantity IS NULL THEN
+            RETURN FALSE;
+        END IF;
+        
+        new_quantity := current_quantity + quantity_change_param;
+        
+        IF new_quantity >= 0 THEN
+            UPDATE products SET quantity = new_quantity WHERE id = product_id_param AND deleted_at IS NULL;
+            GET DIAGNOSTICS update_successful = ROW_COUNT;
+        END IF;
+    END IF;
+    
+    -- Log the inventory change
+    IF update_successful THEN
+        INSERT INTO inventory_history (
+            product_id, variant_id, change_type, quantity_change,
+            quantity_before, quantity_after, reason, reference_id, performed_by
+        ) VALUES (
+            product_id_param, variant_id_param, change_type_param, quantity_change_param,
+            current_quantity, new_quantity, reason_param, reference_id_param, performed_by_param
+        );
+    END IF;
+    
+    RETURN update_successful;
+END;
+$ LANGUAGE plpgsql;
+
+-- Function to soft delete product
+CREATE OR REPLACE FUNCTION soft_delete_product(
+    product_id_param UUID,
+    deleted_by_param UUID
+)
+RETURNS BOOLEAN AS $
+DECLARE
+    deletion_successful BOOLEAN := FALSE;
+BEGIN
+    UPDATE products 
+    SET 
+        deleted_at = NOW(),
+        deleted_by = deleted_by_param,
+        updated_at = NOW()
+    WHERE id = product_id_param AND deleted_at IS NULL;
+    
+    GET DIAGNOSTICS deletion_successful = ROW_COUNT;
+    RETURN deletion_successful;
+END;
+$ LANGUAGE plpgsql;
+
+-- Function to restore soft deleted product
+CREATE OR REPLACE FUNCTION restore_product(product_id_param UUID)
+RETURNS BOOLEAN AS $
+DECLARE
+    restoration_successful BOOLEAN := FALSE;
+BEGIN
+    UPDATE products 
+    SET 
+        deleted_at = NULL,
+        deleted_by = NULL,
+        updated_at = NOW()
+    WHERE id = product_id_param AND deleted_at IS NOT NULL;
+    
+    GET DIAGNOSTICS restoration_successful = ROW_COUNT;
+    RETURN restoration_successful;
+END;
+$ LANGUAGE plpgsql;
+
+-- Function to get low stock products
+CREATE OR REPLACE FUNCTION get_low_stock_products(user_id_param UUID DEFAULT NULL)
+RETURNS TABLE (
+    product_id UUID,
+    product_name VARCHAR(255),
+    sku VARCHAR(100),
+    current_quantity INTEGER,
+    min_quantity INTEGER,
+    status VARCHAR(50)
+) AS $
+BEGIN
+    RETURN QUERY
+    SELECT 
+        p.id as product_id,
+        p.name as product_name,
+        p.sku,
+        p.quantity as current_quantity,
+        p.min_quantity,
+        p.status
+    FROM products

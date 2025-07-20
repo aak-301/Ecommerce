@@ -42,14 +42,15 @@ export class AccountModel {
     return result.rows[0].is_blacklisted;
   }
 
-  // Soft delete user account - FIXED
   static async softDeleteUser(
     userId: string,
     deletedBy?: string,
     reason: string = "user_request",
     notes?: string
   ): Promise<boolean> {
-    const query = `SELECT soft_delete_user($1::UUID, $2::UUID, $3::TEXT, $4::TEXT) as success`;
+    const query = `SELECT soft_delete_user($1, $2, $3, $4) as success`;
+    console.log("Hello-sftU");
+    
     const result = await pool.query(query, [
       userId,
       deletedBy || null,
@@ -62,7 +63,7 @@ export class AccountModel {
 
   // Hard delete user account (permanent) - FIXED
   static async hardDeleteUser(userId: string): Promise<boolean> {
-    const query = `SELECT hard_delete_user($1::UUID) as success`;
+    const query = `SELECT hard_delete_user($1) as success`;
     const result = await pool.query(query, [userId]);
 
     return result.rows[0].success;
@@ -70,7 +71,7 @@ export class AccountModel {
 
   // Restore soft deleted user - FIXED
   static async restoreDeletedUser(userId: string): Promise<boolean> {
-    const query = `SELECT restore_deleted_user($1::UUID) as success`;
+    const query = `SELECT restore_deleted_user($1) as success`;
     const result = await pool.query(query, [userId]);
 
     return result.rows[0].success;

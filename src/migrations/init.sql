@@ -1,13 +1,9 @@
 -- Complete Authentication System with All Features
 -- Single file containing: Authentication, Onboarding, Account Management
--- Create database (run this manually first)
--- CREATE DATABASE auth_system;
 
--- Use the database
--- \c auth_system;
-
--- Enable UUID extension
+-- Enable required extensions
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+CREATE EXTENSION IF NOT EXISTS "plpgsql";
 
 -- =============================================
 -- CORE TABLES
@@ -49,7 +45,7 @@ CREATE TABLE IF NOT EXISTS magic_tokens (
 CREATE TABLE IF NOT EXISTS onboarding_history (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    action VARCHAR(50) NOT NULL CHECK (action IN ('pending', 'approved', 'rejected', 'suspended')),
+    action VARCHAR(50) NOT NULL CHECK (action IN ('pending', 'approved', 'rejected', 'suspended', 'role_changed')),
     performed_by UUID NOT NULL REFERENCES users(id),
     reason TEXT,
     notes TEXT,
@@ -61,7 +57,7 @@ CREATE TABLE IF NOT EXISTS logout_sessions (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     token_hash VARCHAR(255) NOT NULL,
-    logout_reason VARCHAR(100) DEFAULT 'manual' CHECK (logout_reason IN ('manual', 'admin_forced', 'security', 'account_deleted')),
+    logout_reason VARCHAR(100) DEFAULT 'manual' CHECK (logout_reason IN ('manual', 'admin_forced', 'security', 'account_deleted', 'status_change', 'role_change', 'account_update')),
     ip_address INET,
     user_agent TEXT,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
@@ -81,11 +77,6 @@ CREATE TABLE IF NOT EXISTS deleted_accounts (
     deleted_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     user_data JSONB
 );
-
--- Drop all variations of the function
-DROP FUNCTION IF EXISTS soft_delete_user CASCADE;
-DROP FUNCTION IF EXISTS restore_deleted_user CASCADE;
-DROP FUNCTION IF EXISTS hard_delete_user CASCADE;
 
 -- =============================================
 -- INDEXES FOR PERFORMANCE
@@ -133,17 +124,7 @@ BEGIN
     NEW.updated_at = CURRENT_TIMESTAMP;
     RETURN NEW;
 END;
-$$ LANGUAGE 'plpgsql';
-
--- Create trigger to automatically update updated_at
-CREATE TRIGGER update_users_updated_at
-    BEFORE UPDATE ON users
-    FOR EACH ROW
-    EXECUTE FUNCTION update_updated_at_column();
-
--- =============================================
--- ONBOARDING FUNCTIONS
--- =============================================
+$$ LANGUAGE plpgsql;
 
 -- Function to log onboarding history
 CREATE OR REPLACE FUNCTION log_onboarding_history()
@@ -170,12 +151,92 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
+-- Function to validate user role changes
+CREATE OR REPLACE FUNCTION validate_user_role_change()
+RETURNS TRIGGER AS $$
+BEGIN
+    -- Prevent changing super_admin role
+    IF OLD.role = 'super_admin' AND NEW.role != 'super_admin' THEN
+        RAISE EXCEPTION 'Cannot change super_admin role';
+    END IF;
+    
+    -- Log role changes
+    IF OLD.role IS DISTINCT FROM NEW.role THEN
+        INSERT INTO onboarding_history (user_id, action, performed_by, reason, notes)
+        VALUES (
+            NEW.id,
+            'role_changed',
+            NEW.id,
+            CONCAT('Role changed from ', OLD.role, ' to ', NEW.role),
+            'Automatic role change log'
+        );
+    END IF;
+    
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+-- Function to audit user activity
+CREATE OR REPLACE FUNCTION audit_user_activity()
+RETURNS TRIGGER AS $$
+BEGIN
+    -- Log significant user changes
+    IF TG_OP = 'UPDATE' THEN
+        IF OLD.status IS DISTINCT FROM NEW.status OR 
+           OLD.role IS DISTINCT FROM NEW.role OR
+           OLD.deleted_at IS DISTINCT FROM NEW.deleted_at THEN
+            
+            INSERT INTO logout_sessions (user_id, token_hash, logout_reason, user_agent, created_at)
+            VALUES (
+                NEW.id,
+                'AUDIT_LOG',
+                CASE 
+                    WHEN OLD.deleted_at IS NULL AND NEW.deleted_at IS NOT NULL THEN 'account_deleted'
+                    WHEN OLD.status IS DISTINCT FROM NEW.status THEN 'status_change'
+                    WHEN OLD.role IS DISTINCT FROM NEW.role THEN 'role_change'
+                    ELSE 'account_update'
+                END,
+                'System audit log',
+                NOW()
+            );
+        END IF;
+    END IF;
+    
+    RETURN COALESCE(NEW, OLD);
+END;
+$$ LANGUAGE plpgsql;
+
+-- =============================================
+-- CREATE TRIGGERS AFTER FUNCTIONS EXIST
+-- =============================================
+
+-- Create trigger to automatically update updated_at
+CREATE TRIGGER update_users_updated_at
+    BEFORE UPDATE ON users
+    FOR EACH ROW
+    EXECUTE FUNCTION update_updated_at_column();
+
 -- Create trigger for onboarding history
-DROP TRIGGER IF EXISTS onboarding_history_trigger ON users;
 CREATE TRIGGER onboarding_history_trigger
     AFTER UPDATE ON users
     FOR EACH ROW
     EXECUTE FUNCTION log_onboarding_history();
+
+-- Create trigger for role validation
+CREATE TRIGGER validate_user_data
+    BEFORE UPDATE ON users
+    FOR EACH ROW
+    EXECUTE FUNCTION validate_user_role_change();
+
+-- Create trigger for audit trail
+CREATE TRIGGER audit_user_changes
+    AFTER UPDATE OR DELETE ON users
+    FOR EACH ROW
+    EXECUTE FUNCTION audit_user_activity();
+
+-- =============================================
+-- ONBOARDING FUNCTIONS
+-- =============================================
 
 -- Function to get pending admins count
 CREATE OR REPLACE FUNCTION get_pending_admins_count()
@@ -211,6 +272,59 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
+-- Function to get user dashboard stats
+CREATE OR REPLACE FUNCTION get_user_dashboard_stats(user_id_param UUID)
+RETURNS TABLE (
+    total_logins INTEGER,
+    last_login TIMESTAMP WITH TIME ZONE,
+    account_status VARCHAR(50),
+    role VARCHAR(50),
+    days_since_created INTEGER
+) AS $$
+BEGIN
+    RETURN QUERY
+    SELECT 
+        COALESCE(logout_count.total_logins, 0)::INTEGER as total_logins,
+        logout_count.last_login,
+        u.status as account_status,
+        u.role,
+        COALESCE(EXTRACT(DAY FROM NOW() - u.created_at), 0)::INTEGER as days_since_created
+    FROM users u
+    LEFT JOIN (
+        SELECT 
+            user_id,
+            COUNT(*)::INTEGER as total_logins,
+            MAX(created_at) as last_login
+        FROM logout_sessions 
+        WHERE user_id = user_id_param
+        AND logout_reason = 'manual'
+        GROUP BY user_id
+    ) logout_count ON u.id = logout_count.user_id
+    WHERE u.id = user_id_param;
+END;
+$$ LANGUAGE plpgsql;
+
+-- Function to bulk update user status
+CREATE OR REPLACE FUNCTION bulk_update_user_status(
+    user_ids UUID[],
+    new_status VARCHAR(50)
+)
+RETURNS INTEGER AS $$
+DECLARE
+    updated_count INTEGER := 0;
+BEGIN
+    UPDATE users 
+    SET 
+        status = new_status,
+        updated_at = NOW()
+    WHERE id = ANY(user_ids)
+    AND deleted_at IS NULL;
+    
+    GET DIAGNOSTICS updated_count = ROW_COUNT;
+    RETURN updated_count;
+END;
+$$ LANGUAGE plpgsql;
+
 -- =============================================
 -- ACCOUNT MANAGEMENT FUNCTIONS
 -- =============================================
@@ -243,7 +357,7 @@ BEGIN
         updated_at = NOW()
     WHERE id = user_id_param AND deleted_at IS NULL;
     
-    GET DIAGNOSTICS deletion_successful = FOUND;
+    GET DIAGNOSTICS deletion_successful = ROW_COUNT;
     
     IF deletion_successful THEN
         -- Archive user data
@@ -287,7 +401,7 @@ BEGIN
     -- Delete the user record
     DELETE FROM users WHERE id = user_id_param;
     
-    GET DIAGNOSTICS deletion_successful = FOUND;
+    GET DIAGNOSTICS deletion_successful = ROW_COUNT;
     
     RETURN deletion_successful;
 END;
@@ -307,7 +421,7 @@ BEGIN
         updated_at = NOW()
     WHERE id = user_id_param AND deleted_at IS NOT NULL;
     
-    GET DIAGNOSTICS restoration_successful = FOUND;
+    GET DIAGNOSTICS restoration_successful = ROW_COUNT;
     RETURN restoration_successful;
 END;
 $$ LANGUAGE plpgsql;
@@ -415,29 +529,27 @@ BEGIN
     -- Archive customer data before deletion
     INSERT INTO deleted_accounts (
         original_user_id,
+        email,
+        name,
+        role,
         deletion_reason,
         user_data,
-        created_at
+        deleted_at
     )
     SELECT 
         user_id_param,
+        email,
+        name,
+        role,
         'customer_data_cleanup',
         jsonb_build_object(
-            'addresses_count', (SELECT COUNT(*) FROM customer_addresses WHERE customer_id = user_id_param),
-            'orders_count', (SELECT COUNT(*) FROM orders WHERE customer_id = user_id_param),
-            'cart_items_count', (SELECT COUNT(*) FROM shopping_cart WHERE customer_id = user_id_param),
-            'reviews_count', (SELECT COUNT(*) FROM product_reviews WHERE customer_id = user_id_param),
-            'wishlist_count', (SELECT COUNT(*) FROM wishlists WHERE customer_id = user_id_param),
             'cleanup_timestamp', NOW()
         ),
         NOW()
-    WHERE EXISTS (SELECT 1 FROM users WHERE id = user_id_param);
+    FROM users WHERE id = user_id_param;
     
-    -- Customer data will be automatically deleted due to CASCADE constraints
-    -- But we can get the count first for reporting
-    SELECT COUNT(*) INTO cleanup_count
-    FROM customer_addresses 
-    WHERE customer_id = user_id_param;
+    -- Return cleanup count
+    GET DIAGNOSTICS cleanup_count = ROW_COUNT;
     
     RETURN cleanup_count;
 END;
@@ -521,8 +633,55 @@ CREATE OR REPLACE VIEW customer_stats AS
 SELECT 
     (SELECT COUNT(*) FROM users WHERE role = 'customer' AND deleted_at IS NULL) as total_customers,
     (SELECT COUNT(*) FROM users WHERE role = 'customer' AND deleted_at IS NULL AND created_at > NOW() - INTERVAL '30 days') as new_customers_last_30d,
-    (SELECT COUNT(*) FROM users WHERE role = 'customer' AND deleted_at IS NULL AND created_at > NOW() - INTERVAL '7 days') as new_customers_last_7d,
-    (SELECT COUNT(DISTINCT customer_id) FROM orders WHERE created_at > NOW() - INTERVAL '30 days') as active_customers_last_30d;
+    (SELECT COUNT(*) FROM users WHERE role = 'customer' AND deleted_at IS NULL AND created_at > NOW() - INTERVAL '7 days') as new_customers_last_7d;
+
+-- View for pending admin requests
+CREATE OR REPLACE VIEW pending_admin_requests AS
+SELECT 
+    u.id,
+    u.email,
+    u.name,
+    u.status,
+    u.created_at,
+    u.notes,
+    u.rejection_reason,
+    ob.name as onboarded_by_name
+FROM users u
+LEFT JOIN users ob ON u.onboarded_by = ob.id
+WHERE u.role = 'admin' 
+AND u.status = 'pending' 
+AND u.deleted_at IS NULL
+ORDER BY u.created_at ASC;
+
+-- View for user activity log
+CREATE OR REPLACE VIEW user_activity_log AS
+SELECT 
+    u.id,
+    u.email,
+    u.name,
+    u.role,
+    u.status,
+    u.created_at as registered_at,
+    u.updated_at as last_updated,
+    ls.last_activity,
+    ls.total_sessions,
+    CASE 
+        WHEN u.deleted_at IS NOT NULL THEN 'deleted'
+        WHEN ls.last_activity > NOW() - INTERVAL '7 days' THEN 'active'
+        WHEN ls.last_activity > NOW() - INTERVAL '30 days' THEN 'inactive'
+        ELSE 'dormant'
+    END as activity_status
+FROM users u
+LEFT JOIN (
+    SELECT 
+        user_id,
+        MAX(created_at) as last_activity,
+        COUNT(*) as total_sessions
+    FROM logout_sessions
+    GROUP BY user_id
+) ls ON u.id = ls.user_id
+WHERE u.deleted_at IS NULL
+ORDER BY ls.last_activity DESC;
 
 -- =============================================
 -- DEFAULT DATA
@@ -539,82 +698,47 @@ VALUES ('customer@example.com', 'Test Customer', 'customer', 'active')
 ON CONFLICT (email) DO NOTHING;
 
 -- =============================================
--- VERIFICATION AND COMPLETION
+-- VERIFICATION QUERIES
 -- =============================================
 
--- Verify all tables exist
-DO $
-DECLARE
-    table_count INTEGER;
+-- Display all created functions
+DO $$
 BEGIN
-    SELECT COUNT(*) INTO table_count 
-    FROM information_schema.tables 
-    WHERE table_schema = 'public' 
-    AND table_name IN ('users', 'magic_tokens', 'onboarding_history', 'logout_sessions', 'deleted_accounts');
-    
-    IF table_count = 5 THEN
-        RAISE NOTICE 'SUCCESS: All required tables created (%)!', table_count;
-    ELSE
-        RAISE WARNING 'WARNING: Missing tables! Expected 5, found %', table_count;
-    END IF;
-END $;
-
--- Verify all functions exist
-DO $
-DECLARE
-    function_count INTEGER;
-BEGIN
-    SELECT COUNT(*) INTO function_count 
-    FROM information_schema.routines 
-    WHERE routine_schema = 'public' 
-    AND routine_name IN (
-        'update_updated_at_column',
-        'log_onboarding_history',
-        'get_pending_admins_count', 
-        'get_onboarding_stats',
-        'soft_delete_user',
-        'hard_delete_user',
-        'restore_deleted_user',
-        'is_token_blacklisted',
-        'cleanup_old_logout_sessions',
-        'cleanup_expired_tokens',
-        'get_account_deletion_stats',
-        'get_user_activity_summary',
-        'cleanup_customer_data'
-    );
-    
-    IF function_count >= 13 THEN
-        RAISE NOTICE 'SUCCESS: All required functions created (%)!', function_count;
-    ELSE
-        RAISE WARNING 'WARNING: Missing functions! Expected 13+, found %', function_count;
-    END IF;
-END $;
-
--- Verify all views exist
-DO $
-DECLARE
-    view_count INTEGER;
-BEGIN
-    SELECT COUNT(*) INTO view_count 
-    FROM information_schema.views 
-    WHERE table_schema = 'public' 
-    AND table_name IN ('active_users', 'admin_dashboard_stats', 'audit_trail', 'customer_stats');
-    
-    IF view_count = 4 THEN
-        RAISE NOTICE 'SUCCESS: All required views created (%)!', view_count;
-    ELSE
-        RAISE WARNING 'WARNING: Missing views! Expected 4, found %', view_count;
-    END IF;
-END $;
-
-SELECT 
-    'soft_delete_user' as function_name,
-    proname,
-    pg_get_function_arguments(oid) as arguments
-FROM pg_proc 
-WHERE proname = 'soft_delete_user';
-
-SELECT 'All functions recreated successfully!' as status;
-
--- Final success message
-RAISE NOTICE '🎉 Complete Authentication System with Customer Support Initialized!';
+    RAISE NOTICE '=== CREATED FUNCTIONS ===';
+    RAISE NOTICE 'Functions created in this migration:';
+    RAISE NOTICE '1. update_updated_at_column()';
+    RAISE NOTICE '2. log_onboarding_history()';
+    RAISE NOTICE '3. validate_user_role_change()';
+    RAISE NOTICE '4. audit_user_activity()';
+    RAISE NOTICE '5. get_pending_admins_count()';
+    RAISE NOTICE '6. get_onboarding_stats()';
+    RAISE NOTICE '7. get_user_dashboard_stats(UUID)';
+    RAISE NOTICE '8. bulk_update_user_status(UUID[], VARCHAR)';
+    RAISE NOTICE '9. soft_delete_user(UUID, UUID, TEXT, TEXT)';
+    RAISE NOTICE '10. hard_delete_user(UUID)';
+    RAISE NOTICE '11. restore_deleted_user(UUID)';
+    RAISE NOTICE '12. is_token_blacklisted(VARCHAR)';
+    RAISE NOTICE '13. cleanup_old_logout_sessions(INTEGER)';
+    RAISE NOTICE '14. cleanup_expired_tokens()';
+    RAISE NOTICE '15. get_account_deletion_stats()';
+    RAISE NOTICE '16. get_user_activity_summary(UUID)';
+    RAISE NOTICE '17. cleanup_customer_data(UUID)';
+    RAISE NOTICE '';
+    RAISE NOTICE '=== CREATED TRIGGERS ===';
+    RAISE NOTICE 'Triggers created:';
+    RAISE NOTICE '1. update_users_updated_at ON users';
+    RAISE NOTICE '2. onboarding_history_trigger ON users';
+    RAISE NOTICE '3. validate_user_data ON users';
+    RAISE NOTICE '4. audit_user_changes ON users';
+    RAISE NOTICE '';
+    RAISE NOTICE '=== CREATED VIEWS ===';
+    RAISE NOTICE 'Views created:';
+    RAISE NOTICE '1. active_users';
+    RAISE NOTICE '2. admin_dashboard_stats';
+    RAISE NOTICE '3. audit_trail';
+    RAISE NOTICE '4. customer_stats';
+    RAISE NOTICE '5. pending_admin_requests';
+    RAISE NOTICE '6. user_activity_log';
+    RAISE NOTICE '';
+    RAISE NOTICE '🎉 Complete Authentication System Initialized Successfully!';
+END $$;
